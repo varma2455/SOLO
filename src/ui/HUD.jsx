@@ -3,6 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import { SKILLS } from '../data/skills';
 import { Sword, Zap, Wind, Flame, Shield, User, Backpack, Users, Settings, Crosshair } from 'lucide-react';
 import { sound } from '../audio/soundManager';
+import { liveDebugMetrics } from '../game/GameCanvas';
 
 export const HUD = () => {
   const player = useGameStore((s) => s.player);
@@ -14,6 +15,7 @@ export const HUD = () => {
   const extractionTarget = useGameStore((s) => s.extractionTarget);
   const executableEnemyId = useGameStore((s) => s.executableEnemyId);
   const shadows = useGameStore((s) => s.shadows);
+  const graphicsQuality = useGameStore((s) => s.graphicsQuality || 'high');
 
   // Time ticker for cooldown display
   const [, setTick] = useState(0);
@@ -22,21 +24,62 @@ export const HUD = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Debug FPS Counter when ?debug=true
-  const [fps, setFps] = useState(60);
+  // Debug Engine Telemetry Monitor (?debug=true)
+  const [debugStats, setDebugStats] = useState({
+    fps: 60,
+    frameTime: 16.6,
+    drawCalls: 0,
+    triangles: 0,
+    textures: 0,
+    memMB: null
+  });
   const isDebug = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
   useEffect(() => {
-    if (!isDebug) return;
     let frames = 0;
     let lastTime = performance.now();
+    let lowFpsStreak = 0;
+
     const interval = setInterval(() => {
       const nowTime = performance.now();
-      const currentFps = Math.round((frames * 1000) / (nowTime - lastTime));
-      setFps(currentFps);
+      const currentFps = Math.max(1, Math.round((frames * 1000) / (nowTime - lastTime)));
+
+      // Auto FPS Optimization Loop: dynamically steps down quality if framerate struggles
+      if (useGameStore.getState().autoFpsOptimization) {
+        if (currentFps < 42) {
+          lowFpsStreak++;
+          if (lowFpsStreak >= 3) {
+            lowFpsStreak = 0;
+            const curQ = useGameStore.getState().graphicsQuality;
+            if (curQ === 'ultra') useGameStore.getState().setGraphicsQuality('high');
+            else if (curQ === 'high') useGameStore.getState().setGraphicsQuality('medium');
+            else if (curQ === 'medium') useGameStore.getState().setGraphicsQuality('low');
+          }
+        } else {
+          lowFpsStreak = 0;
+        }
+      }
+
+      if (isDebug) {
+        let mem = null;
+        if (typeof window !== 'undefined' && window.performance && window.performance.memory) {
+          mem = Math.round(window.performance.memory.usedJSHeapSize / (1024 * 1024));
+        }
+
+        const metrics = (typeof window !== 'undefined' && window.__debugMetrics) || liveDebugMetrics;
+        setDebugStats({
+          fps: currentFps,
+          frameTime: metrics.frameTime || 16.6,
+          drawCalls: metrics.drawCalls || 0,
+          triangles: metrics.triangles || 0,
+          textures: metrics.textures || 0,
+          memMB: mem
+        });
+      }
+
       frames = 0;
       lastTime = nowTime;
-    }, 1000);
+    }, 500);
 
     let animId;
     const countFrame = () => {
@@ -50,6 +93,7 @@ export const HUD = () => {
       cancelAnimationFrame(animId);
     };
   }, [isDebug]);
+
 
   // Boss Encounter Cinematic Intro
   const [showBossIntro, setShowBossIntro] = useState(false);
@@ -80,24 +124,35 @@ export const HUD = () => {
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
-      {/* Debug FPS Counter when ?debug=true */}
+      {/* Debug Engine Performance Monitor when ?debug=true */}
       {isDebug && (
         <div
           style={{
             position: 'absolute',
-            bottom: 8,
-            left: 8,
-            padding: '4px 8px',
-            background: 'rgba(0, 0, 0, 0.75)',
-            border: '1px solid #4ade80',
-            color: '#4ade80',
+            bottom: 12,
+            left: 12,
+            padding: '10px 14px',
+            background: 'rgba(5, 5, 12, 0.88)',
+            border: '1px solid rgba(16, 185, 129, 0.6)',
+            borderRadius: '6px',
+            color: '#34d399',
             fontFamily: 'monospace',
             fontSize: 12,
-            fontWeight: 'bold',
-            zIndex: 99
+            lineHeight: 1.5,
+            zIndex: 99,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.7)'
           }}
         >
-          FPS: {fps}
+          <div style={{ fontWeight: 800, color: '#6ee7b7', borderBottom: '1px solid rgba(16,185,129,0.3)', paddingBottom: 3, marginBottom: 5, letterSpacing: '0.5px' }}>
+            ENGINE TELEMETRY (?debug=true)
+          </div>
+          <div>FPS: <span style={{ color: debugStats.fps >= 55 ? '#34d399' : debugStats.fps >= 30 ? '#fbbf24' : '#f87171', fontWeight: 800 }}>{debugStats.fps}</span> <span style={{ color: '#9ca3af' }}>({debugStats.frameTime} ms)</span></div>
+          <div>Draw Calls: <span style={{ color: '#f3f4f6' }}>{debugStats.drawCalls}</span></div>
+          <div>Triangles: <span style={{ color: '#f3f4f6' }}>{debugStats.triangles.toLocaleString()}</span></div>
+          <div>Textures: <span style={{ color: '#f3f4f6' }}>{debugStats.textures}</span></div>
+          {debugStats.memMB && <div>JS Memory: <span style={{ color: '#f3f4f6' }}>{debugStats.memMB} MB</span></div>}
+          <div>Preset: <span style={{ color: '#c084fc', textTransform: 'uppercase', fontWeight: 700 }}>{graphicsQuality}</span></div>
         </div>
       )}
 

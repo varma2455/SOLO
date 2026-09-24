@@ -50,19 +50,9 @@ export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f5
       flameOuterRef.current.rotation.y += delta * 2.0;
     }
 
-    // Ascend embers
+    // Gently rotate ember points group on GPU rather than mutating buffer on CPU
     if (sparksRef.current) {
-      const posAttr = sparksRef.current.geometry.attributes.position;
-      for (let i = 0; i < emberCount; i++) {
-        let y = posAttr.getY(i) + delta * 0.9;
-        if (y > 1.4) {
-          y = 0.45;
-          posAttr.setX(i, (Math.random() - 0.5) * 0.12);
-          posAttr.setZ(i, 0.28 + (Math.random() - 0.5) * 0.12);
-        }
-        posAttr.setY(i, y);
-      }
-      posAttr.needsUpdate = true;
+      sparksRef.current.rotation.y += delta * 1.2;
     }
   });
 
@@ -123,50 +113,38 @@ export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f5
         <pointsMaterial size={0.04} color="#fdba74" transparent opacity={0.9} />
       </points>
 
-      {/* Dynamic Flickering Warm PointLight with Falloff */}
+      {/* Dynamic Flickering Warm PointLight with Falloff (Illuminates without expensive multi-pass shadows) */}
       <pointLight
         ref={lightRef}
         position={[0, 0.48, 0.32]}
         color={lightColor}
         intensity={intensity}
-        distance={16}
+        distance={14}
         decay={2}
-        castShadow
-        shadow-bias={-0.002}
-        shadow-mapSize-width={512}
-        shadow-mapSize-height={512}
       />
     </group>
   );
 };
 
-// Atmospheric Underground Dust Motes floating in the air
-export const DungeonDustMotes = ({ count = 120, bounds = [30, 8, 160] }) => {
+// Atmospheric Underground Dust Motes floating in the air (GPU animated)
+export const DungeonDustMotes = ({ count = 100, bounds = [30, 8, 160] }) => {
   const pointsRef = useRef();
 
   const particleData = useMemo(() => {
     const positions = new Float32Array(count * 3);
-    const speeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * bounds[0];
       positions[i * 3 + 1] = 0.5 + Math.random() * bounds[1];
       positions[i * 3 + 2] = -bounds[2] * Math.random() + 20;
-      speeds[i] = 0.2 + Math.random() * 0.4;
     }
-    return { positions, speeds };
-  }, [count]);
+    return { positions };
+  }, [count, bounds]);
 
   useFrame((_, delta) => {
     if (!pointsRef.current) return;
-    const pos = pointsRef.current.geometry.attributes.position;
-    for (let i = 0; i < count; i++) {
-      let y = pos.getY(i) + delta * particleData.speeds[i];
-      if (y > bounds[1] + 1) {
-        y = 0.4;
-      }
-      pos.setY(i, y);
-    }
-    pos.needsUpdate = true;
+    pointsRef.current.position.y += delta * 0.15;
+    if (pointsRef.current.position.y > 1.5) pointsRef.current.position.y = 0;
+    pointsRef.current.rotation.y += delta * 0.03;
   });
 
   return (

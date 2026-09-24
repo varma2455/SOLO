@@ -7,6 +7,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
+import { globalPlayerState } from '../player/Player';
 import { sound } from '../../audio/soundManager';
 
 // -------------------------------------------------------------
@@ -428,10 +429,17 @@ const GraveWarlordMesh = ({ isHit, weaponRef }) => (
   </group>
 );
 
+// Module-level reusable scratch vectors to eliminate garbage collection pauses
+const _scratchPPos = new THREE.Vector3();
+const _scratchMoveDir = new THREE.Vector3();
+const _scratchFlank = new THREE.Vector3();
+const _scratchSurround = new THREE.Vector3();
+const _scratchKb = new THREE.Vector3();
+
 // -------------------------------------------------------------
 // MAIN ENEMY COMPONENT WITH COMPREHENSIVE AI & COMBAT STATE
 // -------------------------------------------------------------
-export const Enemy = ({
+const EnemyComponent = ({
   enemyData,
   playerPos,
   onEnemyDeath,
@@ -454,6 +462,7 @@ export const Enemy = ({
   const attackTimer = useRef(Math.random() * 1.5);
   const patrolTimer = useRef(Math.random() * 3);
   const patrolDir = useRef(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+  const frameTick = useRef(Math.floor(Math.random() * 16));
 
   // Deterministic radial offset for swarming entities to surround player cleanly
   const swarmAngleOffset = useMemo(() => {
@@ -476,8 +485,8 @@ export const Enemy = ({
       // Knockback away from player
       if (playerPos) {
         const kbStrength = enemyData.tier === 'weak' ? 1.0 : enemyData.tier === 'elite' ? 0.35 : 0.6;
-        const kbDir = new THREE.Vector3().subVectors(pos.current, new THREE.Vector3(...playerPos)).normalize();
-        pos.current.addScaledVector(kbDir, kbStrength);
+        _scratchKb.set(pos.current.x - playerPos[0], 0, pos.current.z - playerPos[2]).normalize();
+        pos.current.addScaledVector(_scratchKb, kbStrength);
       }
 
       if (enemyData.hp <= 0 && aiState !== 'DEAD') {
@@ -491,8 +500,11 @@ export const Enemy = ({
   const isExecutable = currentHp > 0 && currentHp / enemyData.maxHp <= 0.15;
   useEffect(() => {
     if (!onNearExecutable) return;
-    const pPos = new THREE.Vector3(...(playerPos || [0, 0, 0]));
-    const dist = pos.current.distanceTo(pPos);
+    const px = playerPos ? playerPos[0] : 0;
+    const py = playerPos ? playerPos[1] : 0.5;
+    const pz = playerPos ? playerPos[2] : 0;
+    _scratchPPos.set(px, py, pz);
+    const dist = pos.current.distanceTo(_scratchPPos);
     if (isExecutable && dist <= 5.0) {
       onNearExecutable(enemyData.id, true);
     } else {
@@ -500,15 +512,30 @@ export const Enemy = ({
     }
   }, [isExecutable, playerPos, onNearExecutable]);
 
-  // AI Frame Loop
+  // AI Frame Loop with Distance-Based Throttling (30-60 FPS Target)
   useFrame((state, delta) => {
     if (!meshRef.current || aiState === 'DEAD') return;
     const dt = Math.min(delta, 0.1);
 
-    if (attackTimer.current > 0) attackTimer.current -= dt;
+    frameTick.current++;
 
-    const pPos = new THREE.Vector3(...playerPos);
-    const distToPlayer = pos.current.distanceTo(pPos);
+    if (globalPlayerState) {
+      _scratchPPos.copy(globalPlayerState.pos);
+    } else if (playerPos) {
+      _scratchPPos.set(playerPos[0], playerPos[1], playerPos[2]);
+    } else {
+      _scratchPPos.set(0, 0.5, 20);
+    }
+
+    const distToPlayer = pos.current.distanceTo(_scratchPPos);
+
+    // AI Distance LOD optimization
+    // Distant > 45m: update every 16 frames (~4 Hz)
+    if (distToPlayer > 45 && frameTick.current % 16 !== 0) return;
+    // Medium 20m–45m: update every 4 frames (~15 Hz)
+    if (distToPlayer > 20 && frameTick.current % 4 !== 0) return;
+
+    if (attackTimer.current > 0) attackTimer.current -= dt;
 
     // Buffed stats
     const effectiveSpeed = enemyData.speed * (hasCommanderBuff ? 1.15 : 1.0);
@@ -521,21 +548,22 @@ export const Enemy = ({
       if (enemyData.role === 'ranged') {
         // RANGED ARCHER: Backs away if player is too close, shoots from distance
         if (distToPlayer < 6.0) {
-          // Kite backward away from player!
+          // Kite backward away from player
           setAiState('KITE');
-          const retreatDir = new THREE.Vector3().subVectors(pos.current, pPos).normalize();
-          pos.current.addScaledVector(retreatDir, effectiveSpeed * dt);
-          rotation.current = Math.atan2(-retreatDir.x, -retreatDir.z);
+          _scratchMoveDir.subVectors(pos.current, _scratchPPos).normalize();
+          pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * dt);
+          rotation.current = Math.atan2(-_scratchMoveDir.x, -_scratchMoveDir.z);
         } else if (distToPlayer <= enemyData.attackRange) {
           // In firing range
-          rotation.current = Math.atan2(pPos.x - pos.current.x, pPos.z - pos.current.z);
+          rotation.current = Math.atan2(_scratchPPos.x - pos.current.x, _scratchPPos.z - pos.current.z);
           if (attackTimer.current <= 0) {
             attackTimer.current = enemyData.attackCooldown;
             setAiState('ATTACK');
             sound.playShadowSlash();
             setTimeout(() => {
               if (aiState !== 'DEAD') {
-                const curDist = pos.current.distanceTo(new THREE.Vector3(...useGameStore.getState().player.position));
+                const pCur = globalPlayerState ? globalPlayerState.pos : _scratchPPos;
+                const curDist = pos.current.distanceTo(pCur);
                 if (curDist <= enemyData.attackRange + 2.0) {
                   onEnemyAttackPlayer(effectiveAttack);
                 }
@@ -545,9 +573,9 @@ export const Enemy = ({
         } else {
           // Move into range
           setAiState('CHASE');
-          const moveDir = new THREE.Vector3().subVectors(pPos, pos.current).normalize();
-          pos.current.addScaledVector(moveDir, effectiveSpeed * dt);
-          rotation.current = Math.atan2(moveDir.x, moveDir.z);
+          _scratchMoveDir.subVectors(_scratchPPos, pos.current).normalize();
+          pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * dt);
+          rotation.current = Math.atan2(_scratchMoveDir.x, _scratchMoveDir.z);
         }
 
       } else if (enemyData.role === 'assassin') {
@@ -564,7 +592,7 @@ export const Enemy = ({
             }
             setTimeout(() => {
               if (aiState !== 'DEAD') {
-                const curDist = pos.current.distanceTo(new THREE.Vector3(...useGameStore.getState().player.position));
+                const curDist = pos.current.distanceTo(_scratchPPos);
                 if (curDist <= enemyData.attackRange + 1.2) {
                   onEnemyAttackPlayer(effectiveAttack);
                 }
@@ -573,25 +601,23 @@ export const Enemy = ({
           }
         } else {
           setAiState('CHASE');
-          // Flanking vector
-          const flankTarget = new THREE.Vector3(
-            pPos.x + Math.sin(swarmAngleOffset) * 2.5,
-            pPos.y,
-            pPos.z + Math.cos(swarmAngleOffset) * 2.5
+          _scratchFlank.set(
+            _scratchPPos.x + Math.sin(swarmAngleOffset) * 2.5,
+            _scratchPPos.y,
+            _scratchPPos.z + Math.cos(swarmAngleOffset) * 2.5
           );
-          const moveDir = new THREE.Vector3().subVectors(flankTarget, pos.current).normalize();
-          pos.current.addScaledVector(moveDir, effectiveSpeed * dt);
-          rotation.current = Math.atan2(moveDir.x, moveDir.z);
+          _scratchMoveDir.subVectors(_scratchFlank, pos.current).normalize();
+          pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * dt);
+          rotation.current = Math.atan2(_scratchMoveDir.x, _scratchMoveDir.z);
         }
 
       } else if (enemyData.role === 'swarm') {
         // SWARM: Spreads radially around player to surround without overlapping
-        const surroundTarget = new THREE.Vector3(
-          pPos.x + Math.sin(swarmAngleOffset) * 1.8,
-          pPos.y,
-          pPos.z + Math.cos(swarmAngleOffset) * 1.8
+        _scratchSurround.set(
+          _scratchPPos.x + Math.sin(swarmAngleOffset) * 1.8,
+          _scratchPPos.y,
+          _scratchPPos.z + Math.cos(swarmAngleOffset) * 1.8
         );
-        const distToTarget = pos.current.distanceTo(surroundTarget);
 
         if (distToPlayer <= enemyData.attackRange + 0.5) {
           if (attackTimer.current <= 0) {
@@ -599,7 +625,7 @@ export const Enemy = ({
             setAiState('ATTACK');
             setTimeout(() => {
               if (aiState !== 'DEAD') {
-                const curDist = pos.current.distanceTo(new THREE.Vector3(...useGameStore.getState().player.position));
+                const curDist = pos.current.distanceTo(_scratchPPos);
                 if (curDist <= enemyData.attackRange + 0.8) {
                   onEnemyAttackPlayer(effectiveAttack);
                 }
@@ -608,9 +634,9 @@ export const Enemy = ({
           }
         } else {
           setAiState('CHASE');
-          const moveDir = new THREE.Vector3().subVectors(surroundTarget, pos.current).normalize();
-          pos.current.addScaledVector(moveDir, effectiveSpeed * dt);
-          rotation.current = Math.atan2(pPos.x - pos.current.x, pPos.z - pos.current.z);
+          _scratchMoveDir.subVectors(_scratchSurround, pos.current).normalize();
+          pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * dt);
+          rotation.current = Math.atan2(_scratchPPos.x - pos.current.x, _scratchPPos.z - pos.current.z);
         }
 
       } else {
@@ -627,7 +653,7 @@ export const Enemy = ({
             }
             setTimeout(() => {
               if (aiState !== 'DEAD') {
-                const curDist = pos.current.distanceTo(new THREE.Vector3(...useGameStore.getState().player.position));
+                const curDist = pos.current.distanceTo(_scratchPPos);
                 if (curDist <= enemyData.attackRange + 1.2) {
                   onEnemyAttackPlayer(effectiveAttack);
                 }
@@ -636,9 +662,9 @@ export const Enemy = ({
           }
         } else {
           setAiState('CHASE');
-          const moveDir = new THREE.Vector3().subVectors(pPos, pos.current).normalize();
-          pos.current.addScaledVector(moveDir, effectiveSpeed * dt);
-          rotation.current = Math.atan2(moveDir.x, moveDir.z);
+          _scratchMoveDir.subVectors(_scratchPPos, pos.current).normalize();
+          pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * dt);
+          rotation.current = Math.atan2(_scratchMoveDir.x, _scratchMoveDir.z);
         }
       }
 
@@ -652,9 +678,9 @@ export const Enemy = ({
 
       const distFromSpawn = pos.current.distanceTo(spawnPos.current);
       if (distFromSpawn > 5.5) {
-        const returnDir = new THREE.Vector3().subVectors(spawnPos.current, pos.current).normalize();
-        pos.current.addScaledVector(returnDir, effectiveSpeed * 0.5 * dt);
-        rotation.current = Math.atan2(returnDir.x, returnDir.z);
+        _scratchMoveDir.subVectors(spawnPos.current, pos.current).normalize();
+        pos.current.addScaledVector(_scratchMoveDir, effectiveSpeed * 0.5 * dt);
+        rotation.current = Math.atan2(_scratchMoveDir.x, _scratchMoveDir.z);
       } else {
         pos.current.addScaledVector(patrolDir.current, effectiveSpeed * 0.3 * dt);
         rotation.current = Math.atan2(patrolDir.current.x, patrolDir.current.z);
@@ -665,12 +691,10 @@ export const Enemy = ({
     meshRef.current.position.copy(pos.current);
     meshRef.current.rotation.y = rotation.current;
 
-    // Billboard health bar and execution tag to camera
-    if (hpBarRef.current) {
-      hpBarRef.current.quaternion.copy(state.camera.quaternion);
-    }
-    if (finisherTagRef.current) {
-      finisherTagRef.current.quaternion.copy(state.camera.quaternion);
+    // Billboard health bar and execution tag to camera only when reasonably close
+    if (distToPlayer < 35) {
+      if (hpBarRef.current) hpBarRef.current.quaternion.copy(state.camera.quaternion);
+      if (finisherTagRef.current) finisherTagRef.current.quaternion.copy(state.camera.quaternion);
     }
   });
 
@@ -781,3 +805,6 @@ export const Enemy = ({
     </group>
   );
 };
+
+export const Enemy = React.memo(EnemyComponent);
+

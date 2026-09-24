@@ -5,6 +5,14 @@ import { useGameStore } from '../../store/gameStore';
 import { sound } from '../../audio/soundManager';
 import { SKILLS } from '../../data/skills';
 
+// High-performance shared player state for 60fps Three.js reading without React re-renders
+export const globalPlayerState = {
+  position: [0, 0.5, 20],
+  posVec: new THREE.Vector3(0, 0.5, 20),
+  rotation: 0,
+  speed: 6.5
+};
+
 // Stylized Crafted Dark Fantasy Shadow Blade
 const ShadowBlade = ({ bladeRef, swingTrailActive }) => {
   return (
@@ -57,12 +65,16 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
 
   const { camera } = useThree();
 
-  // Store state
-  const player = useGameStore((s) => s.player);
+  // Store state - decoupled from frequent player state changes
+  const speed = useGameStore((s) => s.player.speed);
+  const isInvulnerable = useGameStore((s) => s.player.isInvulnerable);
   const roomsUnlocked = useGameStore((s) => s.dungeon.roomsUnlocked);
   const currentRoom = useGameStore((s) => s.dungeon.currentRoom);
   const advanceRoom = useGameStore((s) => s.advanceRoom);
-  const isInvulnerable = player.isInvulnerable;
+
+  // Persistent camera targets to avoid allocating vectors each frame
+  const camTarget = useRef(new THREE.Vector3());
+  const lookTarget = useRef(new THREE.Vector3());
 
   // Local movement & animation states
   const [keys, setKeys] = useState({
@@ -361,14 +373,12 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     groupRef.current.position.set(playerPos.current.x, 0, playerPos.current.z);
     groupRef.current.rotation.y = playerRotation.current;
 
-    // Update store player position
-    useGameStore.setState((s) => ({
-      player: {
-        ...s.player,
-        position: [playerPos.current.x, 0.5, playerPos.current.z],
-        rotation: playerRotation.current
-      }
-    }));
+    // Update high-performance global player position without React re-renders
+    globalPlayerState.position[0] = playerPos.current.x;
+    globalPlayerState.position[1] = 0.5;
+    globalPlayerState.position[2] = playerPos.current.z;
+    globalPlayerState.posVec.set(playerPos.current.x, 0.5, playerPos.current.z);
+    globalPlayerState.rotation = playerRotation.current;
 
     // Body animations
     if (bodyRef.current) {
@@ -439,8 +449,11 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     const camY = playerPos.current.y + camHeight + Math.sin(camPitch) * camDist * 0.65 + shakeY;
     const camZ = playerPos.current.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
 
-    camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.14);
-    camera.lookAt(playerPos.current.x, playerPos.current.y + 1.4, playerPos.current.z);
+    camTarget.current.set(camX, camY, camZ);
+    const damp = 1 - Math.exp(-14 * dt);
+    camera.position.lerp(camTarget.current, damp);
+    lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.4, playerPos.current.z);
+    camera.lookAt(lookTarget.current);
   });
 
   return (

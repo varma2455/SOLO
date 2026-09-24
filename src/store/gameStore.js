@@ -53,6 +53,12 @@ export const useGameStore = create((set, get) => ({
   previousScreen: 'menu',
   isPaused: false,
 
+  // Performance & Graphics Settings
+  graphicsQuality: 'high', // 'low' | 'medium' | 'high' | 'ultra'
+  autoFpsOptimization: true,
+  setGraphicsQuality: (quality) => set({ graphicsQuality: quality }),
+  setAutoFpsOptimization: (enabled) => set({ autoFpsOptimization: enabled }),
+
   // Player state
   player: { ...initialPlayerState },
 
@@ -418,18 +424,26 @@ export const useGameStore = create((set, get) => ({
     return true;
   },
 
-  // Natural Mana & HP Regeneration loop
+  // Natural Mana & HP Regeneration loop (throttled to 4 updates/sec max to avoid React render churn)
   regenTick: (delta) => {
-    set((state) => {
-      if (state.currentScreen !== 'game') return state;
-      const p = state.player;
-      const manaRegenRate = 5.0; // 5 MP / sec
-      const hpRegenRate = 1.0; // 1 HP / sec
-      const nextMana = Math.min(p.maxMana, p.mana + manaRegenRate * delta);
-      const nextHp = Math.min(p.maxHp, p.hp + hpRegenRate * delta);
-      return {
-        player: { ...p, mana: nextMana, hp: nextHp }
-      };
+    if (!regenTick._accum) regenTick._accum = 0;
+    regenTick._accum += delta;
+    if (regenTick._accum < 0.25) return;
+    const elapsed = regenTick._accum;
+    regenTick._accum = 0;
+
+    const state = get();
+    if (state.currentScreen !== 'game') return;
+    const p = state.player;
+    if (p.hp >= p.maxHp && p.mana >= p.maxMana) return;
+
+    const manaRegenRate = 5.0; // 5 MP / sec
+    const hpRegenRate = 1.0; // 1 HP / sec
+    const nextMana = Math.min(p.maxMana, p.mana + manaRegenRate * elapsed);
+    const nextHp = Math.min(p.maxHp, p.hp + hpRegenRate * elapsed);
+
+    set({
+      player: { ...p, mana: nextMana, hp: nextHp }
     });
   },
 

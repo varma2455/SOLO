@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 import { ForgottenCrypt } from './dungeon/ForgottenCrypt';
@@ -10,6 +10,36 @@ import { SkillEffects } from './combat/SkillEffects';
 import { DamageNumbers3D } from './combat/DamageNumbers3D';
 import { checkWebGLSupport } from '../utils/checkWebGL';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
+
+// Engine telemetry metrics exported for HUD performance monitor
+export const liveDebugMetrics = {
+  frameTime: 16.6,
+  drawCalls: 0,
+  triangles: 0,
+  textures: 0,
+  geometries: 0
+};
+if (typeof window !== 'undefined') {
+  window.__debugMetrics = liveDebugMetrics;
+}
+
+const CanvasMetricsCollector = () => {
+  const { gl } = useThree();
+  useFrame((_, delta) => {
+    liveDebugMetrics.frameTime = Number((delta * 1000).toFixed(1));
+    if (gl && gl.info) {
+      if (gl.info.render && gl.info.render.calls > 0) {
+        liveDebugMetrics.drawCalls = gl.info.render.calls;
+        liveDebugMetrics.triangles = gl.info.render.triangles;
+      }
+      if (gl.info.memory) {
+        liveDebugMetrics.textures = gl.info.memory.textures;
+        liveDebugMetrics.geometries = gl.info.memory.geometries;
+      }
+    }
+  });
+  return null;
+};
 
 // Guaranteed Fallback Dungeon Scene in case complex shaders/textures fail
 const FallbackDungeon = () => (
@@ -39,8 +69,10 @@ const FallbackDungeon = () => (
 );
 
 export const GameCanvas = () => {
-  const playerPos = useGameStore((s) => s.player.position);
   const setScreen = useGameStore((s) => s.setScreen);
+  const graphicsQuality = useGameStore((s) => s.graphicsQuality || 'high');
+  const playerPos = useMemo(() => [0, 0.5, 20], []);
+
 
   // Check WebGL availability
   const webglSupport = useMemo(() => checkWebGLSupport(), []);
@@ -137,6 +169,14 @@ export const GameCanvas = () => {
     );
   }
 
+  const dpr = useMemo(() => {
+    const device = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+    if (graphicsQuality === 'low') return 1.0;
+    if (graphicsQuality === 'medium') return Math.min(device, 1.25);
+    if (graphicsQuality === 'high') return Math.min(device, 1.5);
+    return Math.min(device, 2.0);
+  }, [graphicsQuality]);
+
   return (
     <div
       className="game-container"
@@ -154,7 +194,8 @@ export const GameCanvas = () => {
         onReturnToMenu={() => setScreen('menu')}
       >
         <Canvas
-          shadows
+          shadows={graphicsQuality !== 'low'}
+          dpr={dpr}
           camera={{ position: [0, 6, 26], fov: 60, near: 0.1, far: 500 }}
           gl={{
             antialias: false,
@@ -163,13 +204,30 @@ export const GameCanvas = () => {
             alpha: false,
             depth: true
           }}
-          onCreated={({ scene }) => {
+          onCreated={({ scene, gl }) => {
+            if (gl) {
+              const origRender = gl.render.bind(gl);
+              gl.render = (s, c) => {
+                origRender(s, c);
+                if (gl.info && gl.info.render) {
+                  liveDebugMetrics.drawCalls = gl.info.render.calls;
+                  liveDebugMetrics.triangles = gl.info.render.triangles;
+                  if (gl.info.memory) {
+                    liveDebugMetrics.textures = gl.info.memory.textures;
+                    liveDebugMetrics.geometries = gl.info.memory.geometries;
+                  }
+                }
+              };
+            }
             // Visible dark-gray background color (never pure pitch black)
             scene.background = new THREE.Color('#15171c');
             // Atmospheric dungeon fog
             scene.fog = new THREE.Fog('#15171c', 10, 95);
           }}
         >
+          {/* Engine metrics collector for HUD performance overlay */}
+          <CanvasMetricsCollector />
+
           {/* Guaranteed lighting */}
           <ambientLight intensity={0.4} color="#6d28d9" />
           <directionalLight position={[10, 25, 10]} intensity={0.8} color="#e0e7ff" />

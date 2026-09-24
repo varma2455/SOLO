@@ -9,6 +9,10 @@ export const SettingsModal = () => {
   const saveGame = useGameStore((s) => s.saveGame);
   const loadGame = useGameStore((s) => s.loadGame);
   const resetGame = useGameStore((s) => s.resetGame);
+  const graphicsQuality = useGameStore((s) => s.graphicsQuality || 'high');
+  const setGraphicsQuality = useGameStore((s) => s.setGraphicsQuality);
+  const autoFpsOptimization = useGameStore((s) => s.autoFpsOptimization);
+  const setAutoFpsOptimization = useGameStore((s) => s.setAutoFpsOptimization);
 
   const [volume, setVolumeState] = useState(sound.volume);
   const [muted, setMutedState] = useState(sound.muted);
@@ -99,6 +103,53 @@ export const SettingsModal = () => {
               </span>
             </div>
           </div>
+
+          {/* Graphics & Performance Settings */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#c084fc', marginBottom: 10, letterSpacing: '1px' }}>
+              GRAPHICS & PERFORMANCE
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {['low', 'medium', 'high', 'ultra'].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setGraphicsQuality(q)}
+                  className={`btn-rpg ${graphicsQuality === q ? 'glow-box-purple' : 'btn-rpg-secondary'}`}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    borderColor: graphicsQuality === q ? '#a855f7' : undefined,
+                    background: graphicsQuality === q ? 'rgba(147, 51, 234, 0.3)' : undefined
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 4 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f3f4f6' }}>Auto FPS Optimization</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>Dynamically throttles particle & shadow LOD if frame rate drops</div>
+              </div>
+              <button
+                onClick={() => setAutoFpsOptimization(!autoFpsOptimization)}
+                className={`btn-rpg ${autoFpsOptimization ? 'glow-box-purple' : 'btn-rpg-secondary'}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  borderColor: autoFpsOptimization ? '#10b981' : '#6b7280',
+                  color: autoFpsOptimization ? '#34d399' : '#9ca3af'
+                }}
+              >
+                {autoFpsOptimization ? 'ENABLED' : 'DISABLED'}
+              </button>
+            </div>
+          </div>
+
 
           {/* Controls Guide */}
           <div>

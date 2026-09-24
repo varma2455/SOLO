@@ -2,7 +2,12 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
+import { globalPlayerState } from '../player/Player';
 import { sound } from '../../audio/soundManager';
+
+const _bossPPos = new THREE.Vector3();
+const _bossDir = new THREE.Vector3();
+const _bossSlamTarget = new THREE.Vector3();
 
 export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated, onSpawnMinions }) => {
   const meshRef = useRef();
@@ -67,8 +72,13 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     if (attackTimer.current > 0) attackTimer.current -= dt;
     if (specialTimer.current > 0) specialTimer.current -= dt;
 
-    const pPos = new THREE.Vector3(...playerPos);
-    const distToPlayer = pos.current.distanceTo(pPos);
+    if (globalPlayerState) {
+      _bossPPos.copy(globalPlayerState.pos);
+    } else if (playerPos) {
+      _bossPPos.set(playerPos[0], playerPos[1], playerPos[2]);
+    }
+
+    const distToPlayer = pos.current.distanceTo(_bossPPos);
 
     // Speed bonus if enraged
     const speed = bossRage ? 5.5 : 3.6;
@@ -78,15 +88,16 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
       specialTimer.current = bossRage ? 5.5 : 9.0;
       setAiState('TELEGRAPH');
       setShowTelegraph(true);
-      setTelegraphPos([pPos.x, 0.05, pPos.z]);
+      setTelegraphPos([_bossPPos.x, 0.05, _bossPPos.z]);
       sound.playBossRoar();
 
       setTimeout(() => {
         setShowTelegraph(false);
         if (aiState !== 'DEAD') {
           sound.playVoidBurst();
-          const currentPPos = new THREE.Vector3(...useGameStore.getState().player.position);
-          const slamDist = currentPPos.distanceTo(new THREE.Vector3(telegraphPos[0], 0, telegraphPos[2]));
+          const pCurrent = globalPlayerState ? globalPlayerState.pos : _bossPPos;
+          _bossSlamTarget.set(telegraphPos[0], 0, telegraphPos[2]);
+          const slamDist = pCurrent.distanceTo(_bossSlamTarget);
           if (slamDist <= 7.5) {
             onBossAttackPlayer(bossRage ? 65 : 45);
           }
@@ -111,8 +122,8 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
 
           setTimeout(() => {
             if (aiState !== 'DEAD') {
-              const currentPPos = new THREE.Vector3(...useGameStore.getState().player.position);
-              if (pos.current.distanceTo(currentPPos) <= 6.0) {
+              const pCurrent = globalPlayerState ? globalPlayerState.pos : _bossPPos;
+              if (pos.current.distanceTo(pCurrent) <= 6.0) {
                 sound.playHit(true);
                 onBossAttackPlayer(bossRage ? 48 : 36);
               }
@@ -123,9 +134,9 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
       } else if (distToPlayer < 40) {
         // Chase player inside boss arena
         setAiState('CHASE');
-        const dir = new THREE.Vector3().subVectors(pPos, pos.current).normalize();
-        pos.current.addScaledVector(dir, speed * dt);
-        rotation.current = Math.atan2(dir.x, dir.z);
+        _bossDir.subVectors(_bossPPos, pos.current).normalize();
+        pos.current.addScaledVector(_bossDir, speed * dt);
+        rotation.current = Math.atan2(_bossDir.x, _bossDir.z);
       }
     }
 

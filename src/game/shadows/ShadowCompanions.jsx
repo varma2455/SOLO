@@ -2,21 +2,28 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
+import { globalPlayerState } from '../player/Player';
 import { sound } from '../../audio/soundManager';
 
-const SingleShadow = ({ shadow, index, playerPos, enemies, onShadowAttackEnemy }) => {
+const _sPPos = new THREE.Vector3();
+const _sIdleTarget = new THREE.Vector3();
+const _sEnPos = new THREE.Vector3();
+const _sDir = new THREE.Vector3();
+
+const formationOffsets = [
+  [-2.2, 0, 2.4],
+  [2.2, 0, 2.4],
+  [0, 0, 3.4]
+];
+
+const SingleShadow = React.memo(({ shadow, index, playerPos, enemies, onShadowAttackEnemy }) => {
   const meshRef = useRef();
   const bladeRef = useRef();
-  const pos = useRef(new THREE.Vector3(playerPos[0] + (index === 0 ? -2.2 : index === 1 ? 2.2 : 0), 0, playerPos[2] + 2.5));
+  const initialX = playerPos ? playerPos[0] + (index === 0 ? -2.2 : index === 1 ? 2.2 : 0) : 0;
+  const initialZ = playerPos ? playerPos[2] + 2.5 : 22.5;
+  const pos = useRef(new THREE.Vector3(initialX, 0, initialZ));
   const rotation = useRef(0);
   const attackTimer = useRef(0);
-
-  // Formation offset based on index
-  const formationOffsets = [
-    [-2.2, 0, 2.4],
-    [2.2, 0, 2.4],
-    [0, 0, 3.4]
-  ];
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
@@ -25,30 +32,36 @@ const SingleShadow = ({ shadow, index, playerPos, enemies, onShadowAttackEnemy }
 
     if (attackTimer.current > 0) attackTimer.current -= dt;
 
-    const pPos = new THREE.Vector3(...playerPos);
+    if (globalPlayerState) {
+      _sPPos.copy(globalPlayerState.pos);
+    } else if (playerPos) {
+      _sPPos.set(playerPos[0], playerPos[1], playerPos[2]);
+    }
+
     const offset = formationOffsets[index % formationOffsets.length];
-    const idleTarget = new THREE.Vector3(pPos.x + offset[0], 0, pPos.z + offset[2]);
+    _sIdleTarget.set(_sPPos.x + offset[0], 0, _sPPos.z + offset[2]);
 
     // Check for nearby living enemies to attack
     let targetEnemy = null;
     let closestDist = 12.0;
 
     if (enemies && enemies.length > 0) {
-      enemies.forEach((en) => {
-        if (en.hp > 0) {
-          const enPos = new THREE.Vector3(...en.position);
-          const dist = pos.current.distanceTo(enPos);
+      for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        if (en.hp > 0 && en.position) {
+          _sEnPos.set(en.position[0], en.position[1], en.position[2]);
+          const dist = pos.current.distanceTo(_sEnPos);
           if (dist < closestDist) {
             closestDist = dist;
             targetEnemy = en;
           }
         }
-      });
+      }
     }
 
-    if (targetEnemy) {
-      const enPos = new THREE.Vector3(...targetEnemy.position);
-      const distToEnemy = pos.current.distanceTo(enPos);
+    if (targetEnemy && targetEnemy.position) {
+      _sEnPos.set(targetEnemy.position[0], targetEnemy.position[1], targetEnemy.position[2]);
+      const distToEnemy = pos.current.distanceTo(_sEnPos);
 
       if (distToEnemy <= (shadow.attackRange || 2.2)) {
         // Attack enemy
@@ -68,25 +81,26 @@ const SingleShadow = ({ shadow, index, playerPos, enemies, onShadowAttackEnemy }
           }
         }
         // Face enemy
-        const dir = new THREE.Vector3().subVectors(enPos, pos.current).normalize();
-        rotation.current = Math.atan2(dir.x, dir.z);
+        _sDir.subVectors(_sEnPos, pos.current).normalize();
+        rotation.current = Math.atan2(_sDir.x, _sDir.z);
       } else {
         // Run towards enemy
-        const dir = new THREE.Vector3().subVectors(enPos, pos.current).normalize();
-        pos.current.addScaledVector(dir, (shadow.speed || 4.0) * dt);
-        rotation.current = Math.atan2(dir.x, dir.z);
+        _sDir.subVectors(_sEnPos, pos.current).normalize();
+        pos.current.addScaledVector(_sDir, (shadow.speed || 4.0) * dt);
+        rotation.current = Math.atan2(_sDir.x, _sDir.z);
       }
     } else {
       // Follow Kael in formation
-      const distToFormation = pos.current.distanceTo(idleTarget);
+      const distToFormation = pos.current.distanceTo(_sIdleTarget);
       if (distToFormation > 1.0) {
-        const dir = new THREE.Vector3().subVectors(idleTarget, pos.current).normalize();
+        _sDir.subVectors(_sIdleTarget, pos.current).normalize();
         const followSpeed = distToFormation > 6 ? 9.0 : 5.0;
-        pos.current.addScaledVector(dir, followSpeed * dt);
-        rotation.current = Math.atan2(dir.x, dir.z);
+        pos.current.addScaledVector(_sDir, followSpeed * dt);
+        rotation.current = Math.atan2(_sDir.x, _sDir.z);
       } else {
         // Face player direction
-        rotation.current = THREE.MathUtils.lerp(rotation.current, useGameStore.getState().player.rotation, 0.1);
+        const targetRot = globalPlayerState ? globalPlayerState.rotation : 0;
+        rotation.current = THREE.MathUtils.lerp(rotation.current, targetRot, 0.1);
       }
     }
 
@@ -195,7 +209,8 @@ const SingleShadow = ({ shadow, index, playerPos, enemies, onShadowAttackEnemy }
       </group>
     </group>
   );
-};
+});
+
 
 export const ShadowCompanions = ({ playerPos, enemies, onShadowAttackEnemy }) => {
   const shadows = useGameStore((s) => s.shadows);

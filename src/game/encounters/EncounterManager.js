@@ -3,7 +3,7 @@
 // Generates procedural, unpredictable dungeon room encounters
 // -------------------------------------------------------------
 
-import { ENEMY_TYPES, DUNGEON_RANKS, scaleEnemyStats } from '../../data/enemies';
+import { ENEMY_TYPES, DUNGEON_RANKS, scaleEnemyStats } from '../../data/enemies.js';
 
 export const ENCOUNTER_TYPES = {
   SWARM: 'SWARM',           // 20-40 weak enemies in waves
