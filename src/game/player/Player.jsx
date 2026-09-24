@@ -7,8 +7,9 @@ import { SKILLS } from '../../data/skills';
 
 // High-performance shared player state for 60fps Three.js reading without React re-renders
 export const globalPlayerState = {
-  position: [0, 0.5, 20],
-  posVec: new THREE.Vector3(0, 0.5, 20),
+  position: [0, 0.5, 4],
+  pos: new THREE.Vector3(0, 0.5, 4),
+  posVec: new THREE.Vector3(0, 0.5, 4),
   rotation: 0,
   speed: 6.5
 };
@@ -87,7 +88,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
   });
 
   const mouseRef = useRef({ yaw: 0, pitch: 0.35, isDragging: false });
-  const playerPos = useRef(new THREE.Vector3(0, 0, 20));
+  const playerPos = useRef(new THREE.Vector3(0, 0, 4));
   const playerRotation = useRef(0);
   const distanceMoved = useRef(0);
 
@@ -284,11 +285,11 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     const moveX = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
     const moveZ = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
     const isMoving = moveX !== 0 || moveZ !== 0;
-    const speed = player.speed || 6.5;
+    const moveSpeed = speed || 6.5;
 
     if (dashState.current.isDashing) {
       dashState.current.timer -= dt;
-      const dashSpeed = speed * 3.4;
+      const dashSpeed = moveSpeed * 3.4;
       playerPos.current.x += dashState.current.dir.x * dashSpeed * dt;
       playerPos.current.z += dashState.current.dir.z * dashSpeed * dt;
       if (dashState.current.timer <= 0) {
@@ -298,7 +299,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       const moveDir = new THREE.Vector3(moveX, 0, moveZ).normalize();
       moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), mouseRef.current.yaw);
 
-      const stepDist = speed * dt;
+      const stepDist = moveSpeed * dt;
       playerPos.current.x += moveDir.x * stepDist;
       playerPos.current.z += moveDir.z * stepDist;
       distanceMoved.current += stepDist;
@@ -377,6 +378,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     globalPlayerState.position[0] = playerPos.current.x;
     globalPlayerState.position[1] = 0.5;
     globalPlayerState.position[2] = playerPos.current.z;
+    globalPlayerState.pos.set(playerPos.current.x, 0.5, playerPos.current.z);
     globalPlayerState.posVec.set(playerPos.current.x, 0.5, playerPos.current.z);
     globalPlayerState.rotation = playerRotation.current;
 
@@ -457,7 +459,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0, 20]}>
+    <group ref={groupRef} position={[0, 0, 4]}>
       {/* Ground Shadow Ring */}
       <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.75, 24]} />

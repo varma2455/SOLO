@@ -104,10 +104,11 @@ const EclipseDominionVFX = ({ effect, onComplete }) => {
   );
 };
 
-export const SkillEffects = ({ activeEffects, onEffectEnd }) => {
+export const SkillEffects = ({ activeEffects = [], effects = [], onEffectEnd }) => {
+  const list = activeEffects.length > 0 ? activeEffects : effects;
   return (
     <group>
-      {activeEffects.map((effect) => {
+      {list.map((effect) => {
         if (effect.type === 'shadowSlash') {
           return <SlashWave key={effect.id} effect={effect} onComplete={onEffectEnd} />;
         }

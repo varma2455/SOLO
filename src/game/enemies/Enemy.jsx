@@ -519,12 +519,12 @@ const EnemyComponent = ({
 
     frameTick.current++;
 
-    if (globalPlayerState) {
-      _scratchPPos.copy(globalPlayerState.pos);
+    if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
+      _scratchPPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
     } else if (playerPos) {
       _scratchPPos.set(playerPos[0], playerPos[1], playerPos[2]);
     } else {
-      _scratchPPos.set(0, 0.5, 20);
+      _scratchPPos.set(0, 0.5, 4);
     }
 
     const distToPlayer = pos.current.distanceTo(_scratchPPos);
@@ -562,7 +562,7 @@ const EnemyComponent = ({
             sound.playShadowSlash();
             setTimeout(() => {
               if (aiState !== 'DEAD') {
-                const pCur = globalPlayerState ? globalPlayerState.pos : _scratchPPos;
+                const pCur = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _scratchPPos) : _scratchPPos;
                 const curDist = pos.current.distanceTo(pCur);
                 if (curDist <= enemyData.attackRange + 2.0) {
                   onEnemyAttackPlayer(effectiveAttack);

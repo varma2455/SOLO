@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { getWoodMaterials, getIronMaterials } from './DungeonTextures';
 
 // Single Realistic Dungeon Wall Torch
-export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f59e0b', intensity = 2.0 }) => {
+export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f59e0b', intensity = 3.0 }) => {
   const lightRef = useRef();
   const flameCoreRef = useRef();
   const flameOuterRef = useRef();
@@ -119,8 +119,8 @@ export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f5
         position={[0, 0.48, 0.32]}
         color={lightColor}
         intensity={intensity}
-        distance={14}
-        decay={2}
+        distance={22}
+        decay={1.4}
       />
     </group>
   );

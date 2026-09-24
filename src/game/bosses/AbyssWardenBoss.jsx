@@ -72,8 +72,8 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     if (attackTimer.current > 0) attackTimer.current -= dt;
     if (specialTimer.current > 0) specialTimer.current -= dt;
 
-    if (globalPlayerState) {
-      _bossPPos.copy(globalPlayerState.pos);
+    if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
+      _bossPPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
     } else if (playerPos) {
       _bossPPos.set(playerPos[0], playerPos[1], playerPos[2]);
     }
@@ -95,7 +95,7 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
         setShowTelegraph(false);
         if (aiState !== 'DEAD') {
           sound.playVoidBurst();
-          const pCurrent = globalPlayerState ? globalPlayerState.pos : _bossPPos;
+          const pCurrent = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _bossPPos) : _bossPPos;
           _bossSlamTarget.set(telegraphPos[0], 0, telegraphPos[2]);
           const slamDist = pCurrent.distanceTo(_bossSlamTarget);
           if (slamDist <= 7.5) {
@@ -122,7 +122,7 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
 
           setTimeout(() => {
             if (aiState !== 'DEAD') {
-              const pCurrent = globalPlayerState ? globalPlayerState.pos : _bossPPos;
+              const pCurrent = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _bossPPos) : _bossPPos;
               if (pos.current.distanceTo(pCurrent) <= 6.0) {
                 sound.playHit(true);
                 onBossAttackPlayer(bossRage ? 48 : 36);

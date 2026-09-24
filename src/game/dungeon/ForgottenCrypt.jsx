@@ -142,12 +142,13 @@ export const ForgottenCrypt = () => {
       bumpMap: floorBump,
       bumpScale: 0.08,
       roughnessMap: floorRough,
-      roughness: 0.85,
-      metalness: 0.08
+      roughness: 0.8,
+      metalness: 0.05,
+      color: '#ffffff'
     });
-    floorAlbedo.repeat.set(8, 24);
-    floorBump.repeat.set(8, 24);
-    floorRough.repeat.set(8, 24);
+    if (floorAlbedo) floorAlbedo.repeat.set(8, 24);
+    if (floorBump) floorBump.repeat.set(8, 24);
+    if (floorRough) floorRough.repeat.set(8, 24);
     return mat;
   }, [floorAlbedo, floorBump, floorRough]);
 
@@ -156,33 +157,34 @@ export const ForgottenCrypt = () => {
       map: wallAlbedo,
       bumpMap: wallBump,
       bumpScale: 0.1,
-      roughness: 0.9,
-      metalness: 0.05
+      roughness: 0.85,
+      metalness: 0.05,
+      color: '#ffffff'
     });
-    wallAlbedo.repeat.set(4, 2);
-    wallBump.repeat.set(4, 2);
+    if (wallAlbedo) wallAlbedo.repeat.set(4, 2);
+    if (wallBump) wallBump.repeat.set(4, 2);
     return mat;
   }, [wallAlbedo, wallBump]);
 
   return (
     <group>
-      {/* --- REALISTIC CINEMATIC DUNGEON LIGHTING --- */}
-      {/* Low moody underground ambient light */}
-      <ambientLight intensity={0.18} color="#2e1065" />
+      {/* --- REALISTIC VISIBLE DUNGEON LIGHTING --- */}
+      {/* Visible dark fantasy ambient light */}
+      <ambientLight intensity={0.75} color="#cbd5e1" />
 
-      {/* Cold faint moonbeam filtering through collapsed ceiling fissure */}
+      {/* Primary directional moonbeam casting crisp shadows */}
       <directionalLight
-        position={[15, 30, -35]}
-        intensity={0.45}
-        color="#38bdf8"
+        position={[12, 28, 10]}
+        intensity={1.8}
+        color="#f1f5f9"
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-bias={-0.001}
+        shadow-bias={-0.0005}
       />
 
       {/* Atmospheric Underground Floating Dust Particles */}
-      <DungeonDustMotes count={150} />
+      <DungeonDustMotes count={100} />
 
       {/* ============================================================== */}
       {/* 1. ENTRANCE & DESCENDING CORRIDOR (Z: 28 to 8)                 */}
@@ -191,10 +193,9 @@ export const ForgottenCrypt = () => {
       <mesh position={[0, -0.05, 18]} receiveShadow rotation={[-Math.PI / 2, 0, 0]} material={floorMaterial}>
         <planeGeometry args={[14, 22]} />
       </mesh>
-      {/* Low Vaulted Stone Ceiling */}
-      <mesh position={[0, 6.2, 18]} rotation={[Math.PI / 2, 0, 0]} material={wallMaterial}>
-        <planeGeometry args={[14, 22]} />
-      </mesh>
+      {/* Vaulted Stone Archway */}
+      <StoneArch position={[0, 0, 20]} width={14} height={6.2} />
+      <StoneArch position={[0, 0, 12]} width={14} height={6.2} />
       {/* Side Walls */}
       <mesh position={[-7, 3, 18]} material={wallMaterial}>
         <boxGeometry args={[1, 6.2, 22]} />
@@ -231,10 +232,11 @@ export const ForgottenCrypt = () => {
       <mesh position={[0, -0.05, -9]} receiveShadow rotation={[-Math.PI / 2, 0, 0]} material={floorMaterial}>
         <planeGeometry args={[28, 34]} />
       </mesh>
-      {/* Vaulted Ceiling with rafters */}
-      <mesh position={[0, 8.5, -9]} rotation={[Math.PI / 2, 0, 0]} material={wallMaterial}>
-        <planeGeometry args={[28, 34]} />
-      </mesh>
+      {/* Vaulted Stone Arch Ribs (Visually defines ceiling without blocking directional light) */}
+      <StoneArch position={[0, 0, 4]} width={28} height={8.5} />
+      <StoneArch position={[0, 0, -6]} width={28} height={8.5} />
+      <StoneArch position={[0, 0, -16]} width={28} height={8.5} />
+      <StoneArch position={[0, 0, -25]} width={28} height={8.5} />
       {/* Side Walls */}
       <mesh position={[-14, 4.2, -9]} material={wallMaterial}>
         <boxGeometry args={[1, 8.5, 34]} />
@@ -248,6 +250,14 @@ export const ForgottenCrypt = () => {
       <GrandColumn position={[7.5, 0, -2]} height={8.0} broken />
       <GrandColumn position={[-7.5, 0, -16]} height={8.0} broken />
       <GrandColumn position={[7.5, 0, -16]} height={8.0} />
+
+      {/* Column-mounted torches right in the action area */}
+      <DungeonTorch position={[-7.5, 3.2, -1.2]} />
+      <DungeonTorch position={[7.5, 3.2, -1.2]} />
+      <DungeonTorch position={[-7.5, 3.2, -15.2]} />
+      <DungeonTorch position={[7.5, 3.2, -15.2]} />
+      <DungeonTorch position={[-4.5, 2.8, 3.5]} />
+      <DungeonTorch position={[4.5, 2.8, 3.5]} />
 
       {/* Tombs and Sarcophagi */}
       <Sarcophagus position={[-11, 0, -5]} rotation={[0, Math.PI / 2, 0]} />

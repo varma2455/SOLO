@@ -50,8 +50,8 @@ export function getFlagstoneMaterials() {
     albedoCanvas.height = height;
     const ctxA = albedoCanvas.getContext('2d');
 
-    // Base dark stone tone
-    ctxA.fillStyle = '#1c1b22';
+    // Base dark stone mortar tone
+    ctxA.fillStyle = '#272b38';
     ctxA.fillRect(0, 0, width, height);
 
     // Draw irregular flagstone blocks
@@ -68,11 +68,11 @@ export function getFlagstoneMaterials() {
         const w = cellW - 6 + (Math.random() - 0.5) * 4;
         const h = cellH - 6 + (Math.random() - 0.5) * 4;
 
-        // Stone block base color variations (slate, brownish-grey, charcoal)
-        const tone = Math.floor(32 + Math.random() * 26);
-        const rTone = tone + Math.floor(Math.random() * 8);
-        const gTone = tone + Math.floor(Math.random() * 6);
-        const bTone = tone + 4 + Math.floor(Math.random() * 12);
+        // Stone block base color variations (visible gothic slate and granite)
+        const tone = Math.floor(75 + Math.random() * 35);
+        const rTone = tone;
+        const gTone = tone + 2;
+        const bTone = tone + 10;
         ctxA.fillStyle = `rgb(${rTone}, ${gTone}, ${bTone})`;
 
         ctxA.beginPath();
@@ -80,7 +80,7 @@ export function getFlagstoneMaterials() {
         ctxA.fill();
 
         // Subtle surface cracks
-        ctxA.strokeStyle = 'rgba(10, 8, 14, 0.45)';
+        ctxA.strokeStyle = 'rgba(25, 28, 38, 0.6)';
         ctxA.lineWidth = 1.5;
         if (Math.random() < 0.6) {
           ctxA.beginPath();
@@ -188,7 +188,7 @@ export function getWallMaterials() {
     albedoCanvas.height = height;
     const ctxA = albedoCanvas.getContext('2d');
 
-    ctxA.fillStyle = '#18171f';
+    ctxA.fillStyle = '#222633';
     ctxA.fillRect(0, 0, width, height);
 
     const rows = 12;
@@ -204,8 +204,8 @@ export function getWallMaterials() {
         const w = cellW - 4;
         const h = cellH - 4;
 
-        const baseVal = Math.floor(28 + Math.random() * 24);
-        ctxA.fillStyle = `rgb(${baseVal}, ${baseVal - 2}, ${baseVal + 4})`;
+        const baseVal = Math.floor(68 + Math.random() * 28);
+        ctxA.fillStyle = `rgb(${baseVal}, ${baseVal + 2}, ${baseVal + 8})`;
         ctxA.beginPath();
         safeRoundRect(ctxA, x, y, w, h, 3);
         ctxA.fill();

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 import { ForgottenCrypt } from './dungeon/ForgottenCrypt';
@@ -28,10 +29,8 @@ const CanvasMetricsCollector = () => {
   useFrame((_, delta) => {
     liveDebugMetrics.frameTime = Number((delta * 1000).toFixed(1));
     if (gl && gl.info) {
-      if (gl.info.render && gl.info.render.calls > 0) {
-        liveDebugMetrics.drawCalls = gl.info.render.calls;
-        liveDebugMetrics.triangles = gl.info.render.triangles;
-      }
+      liveDebugMetrics.drawCalls = gl.info.render.calls;
+      liveDebugMetrics.triangles = gl.info.render.triangles;
       if (gl.info.memory) {
         liveDebugMetrics.textures = gl.info.memory.textures;
         liveDebugMetrics.geometries = gl.info.memory.geometries;
@@ -40,6 +39,24 @@ const CanvasMetricsCollector = () => {
   });
   return null;
 };
+
+// Simple Test Scene as requested in Step 3
+const SimpleTestScene = () => (
+  <group>
+    <ambientLight intensity={1.0} />
+    <directionalLight position={[5, 10, 5]} intensity={2.0} />
+    {/* Large Plane */}
+    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[30, 30]} />
+      <meshStandardMaterial color="#55505a" roughness={0.85} />
+    </mesh>
+    {/* Red Cube */}
+    <mesh position={[0, 1, 0]}>
+      <boxGeometry args={[1.5, 1.5, 1.5]} />
+      <meshStandardMaterial color="#ef4444" roughness={0.3} />
+    </mesh>
+  </group>
+);
 
 // Guaranteed Fallback Dungeon Scene in case complex shaders/textures fail
 const FallbackDungeon = () => (
@@ -177,6 +194,8 @@ export const GameCanvas = () => {
     return Math.min(device, 2.0);
   }, [graphicsQuality]);
 
+  const isDebug = typeof window !== 'undefined' && window.location.search.includes('debug=true');
+
   return (
     <div
       className="game-container"
@@ -196,7 +215,7 @@ export const GameCanvas = () => {
         <Canvas
           shadows={graphicsQuality !== 'low'}
           dpr={dpr}
-          camera={{ position: [0, 6, 26], fov: 60, near: 0.1, far: 500 }}
+          camera={{ position: [0, 3.2, 9.5], fov: 60, near: 0.1, far: 500 }}
           gl={{
             antialias: false,
             powerPreference: 'default',
@@ -204,60 +223,46 @@ export const GameCanvas = () => {
             alpha: false,
             depth: true
           }}
-          onCreated={({ scene, gl }) => {
-            if (gl) {
-              const origRender = gl.render.bind(gl);
-              gl.render = (s, c) => {
-                origRender(s, c);
-                if (gl.info && gl.info.render) {
-                  liveDebugMetrics.drawCalls = gl.info.render.calls;
-                  liveDebugMetrics.triangles = gl.info.render.triangles;
-                  if (gl.info.memory) {
-                    liveDebugMetrics.textures = gl.info.memory.textures;
-                    liveDebugMetrics.geometries = gl.info.memory.geometries;
-                  }
-                }
-              };
-            }
+          onCreated={({ scene }) => {
             // Visible dark-gray background color (never pure pitch black)
-            scene.background = new THREE.Color('#15171c');
+            scene.background = new THREE.Color('#15131c');
             // Atmospheric dungeon fog
-            scene.fog = new THREE.Fog('#15171c', 10, 95);
+            scene.fog = new THREE.Fog('#15131c', 25, 110);
           }}
         >
           {/* Engine metrics collector for HUD performance overlay */}
           <CanvasMetricsCollector />
 
-          {/* Guaranteed lighting */}
-          <ambientLight intensity={0.4} color="#6d28d9" />
-          <directionalLight position={[10, 25, 10]} intensity={0.8} color="#e0e7ff" />
+          {/* Development Axis Helper when ?debug=true */}
+          {isDebug && <axesHelper args={[2]} />}
 
-          {/* 3D Dungeon Environment (or Fallback if requested) */}
-          {!useFallbackScene ? <ForgottenCrypt /> : <FallbackDungeon />}
+          {/* 3D Realistic Dungeon Environment */}
+          {typeof window !== 'undefined' && window.location.search.includes('simple=true') ? (
+            <SimpleTestScene />
+          ) : useFallbackScene ? (
+            <FallbackDungeon />
+          ) : (
+            <ForgottenCrypt quality={graphicsQuality} />
+          )}
 
-          {/* Player Kael */}
-          <Player onAttackHit={handleAttackHit} onSkillTrigger={handleSkillTrigger} />
+          {/* Summoned Shadows Following Player */}
+          <ShadowCompanions onShadowAttack={handleShadowAttack} livingEnemies={livingEnemies} />
 
-          {/* Shadow Army Companions */}
-          <ShadowCompanions
-            playerPos={playerPos}
-            enemies={livingEnemies}
-            onShadowAttackEnemy={handleShadowAttack}
-          />
-
-          {/* Enemies, Boss, Loot & Extraction Beacons */}
+          {/* Dynamic Dungeon Encounters & Enemies */}
           <EnemyManager
-            playerPos={playerPos}
             combatAttackEvent={combatAttackEvent}
             skillEvent={skillEvent}
             shadowAttackEvent={shadowAttackEvent}
             onLivingEnemiesChange={setLivingEnemies}
           />
 
-          {/* 3D Skill Visual FX */}
+          {/* Player Kael */}
+          <Player onAttackHit={handleAttackHit} onSkillTrigger={handleSkillTrigger} />
+
+          {/* Combat FX & Slashes */}
           <SkillEffects activeEffects={activeEffects} onEffectEnd={handleEffectEnd} />
 
-          {/* 3D Floating Combat Damage Numbers */}
+          {/* 3D Floating Combat Text */}
           <DamageNumbers3D />
         </Canvas>
       </ErrorBoundary>

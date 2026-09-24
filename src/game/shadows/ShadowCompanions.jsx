@@ -32,8 +32,8 @@ const SingleShadow = React.memo(({ shadow, index, playerPos, enemies, onShadowAt
 
     if (attackTimer.current > 0) attackTimer.current -= dt;
 
-    if (globalPlayerState) {
-      _sPPos.copy(globalPlayerState.pos);
+    if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
+      _sPPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
     } else if (playerPos) {
       _sPPos.set(playerPos[0], playerPos[1], playerPos[2]);
     }

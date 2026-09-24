@@ -47,6 +47,8 @@ const initialPlayerState = {
   rotation: 0
 };
 
+let regenAccumulator = 0;
+
 export const useGameStore = create((set, get) => ({
   // Screen management: 'menu', 'game', 'character', 'inventory', 'shadows', 'settings', 'gameover', 'victory'
   currentScreen: 'menu',
@@ -426,11 +428,10 @@ export const useGameStore = create((set, get) => ({
 
   // Natural Mana & HP Regeneration loop (throttled to 4 updates/sec max to avoid React render churn)
   regenTick: (delta) => {
-    if (!regenTick._accum) regenTick._accum = 0;
-    regenTick._accum += delta;
-    if (regenTick._accum < 0.25) return;
-    const elapsed = regenTick._accum;
-    regenTick._accum = 0;
+    regenAccumulator += delta;
+    if (regenAccumulator < 0.25) return;
+    const elapsed = regenAccumulator;
+    regenAccumulator = 0;
 
     const state = get();
     if (state.currentScreen !== 'game') return;
