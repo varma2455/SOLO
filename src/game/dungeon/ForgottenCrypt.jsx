@@ -13,7 +13,12 @@ import {
   DrippingCeilingWater,
   AncientStatue,
   StoneArch,
-  IronPortcullis
+  IronPortcullis,
+  AncientSaveShrine,
+  MonsterFootprints,
+  BloodSplatter,
+  WallClawScratches,
+  VoidRiftClue
 } from './DungeonProps';
 import { DungeonTorch, DungeonDustMotes } from './TorchLight';
 
@@ -222,6 +227,14 @@ export const ForgottenCrypt = () => {
       <SkeletonRemains position={[-5.2, 0, 16]} rotation={[0, 0.6, 0]} />
       <HangingCage position={[0, 6.0, 16]} chainLength={2.8} />
 
+      {/* Entrance Safe Point Shrine */}
+      <AncientSaveShrine position={[4.6, 0, 23.5]} name="Entrance Shrine" />
+
+      {/* Environmental Clues: Footprints & Blood leading deeper */}
+      <MonsterFootprints startPos={[0, 0, 20]} endPos={[0, 0, 9]} count={6} />
+      <BloodSplatter position={[1.2, 0, 13]} scale={1.1} rotation={0.4} />
+      <WallClawScratches position={[-6.4, 2.0, 15]} rotation={[0, Math.PI / 2, 0]} />
+
       {/* Transition Arch into Room 1 */}
       <StoneArch position={[0, 0, 8]} width={8} height={5.8} />
 
@@ -276,11 +289,13 @@ export const ForgottenCrypt = () => {
       <DrippingCeilingWater position={[-2.5, 0, -8]} height={8.2} />
       <WaterPuddle position={[4.2, 0, -19]} radius={2.0} />
 
-      {/* Storytelling Debris */}
+      {/* Storytelling Debris & Clues */}
       <DiscardedShieldAndSword position={[3.2, 0, -4]} rotation={[0, 0.4, 0]} />
       <SkeletonRemains position={[9.5, 0, -18]} rotation={[0, 1.2, 0]} />
       <WoodBarrel position={[12, 0, -23]} />
       <DungeonCrate position={[12, 0, -21.8]} />
+      <BloodSplatter position={[4.5, 0, -12]} scale={1.3} rotation={0.8} />
+      <MonsterFootprints startPos={[0, 0, -18]} endPos={[0, 0, -25]} count={5} />
 
       {/* Hanging Iron Cages */}
       <HangingCage position={[-7.5, 8.2, -9]} chainLength={4.2} />
@@ -318,6 +333,9 @@ export const ForgottenCrypt = () => {
       <DungeonTorch position={[3.6, 1.2, -28.5]} />
       <DungeonTorch position={[-3.6, 1.2, -38.5]} />
       <DungeonTorch position={[3.6, 1.2, -38.5]} />
+
+      {/* Bridge Checkpoint Shrine before Elite Sanctum */}
+      <AncientSaveShrine position={[0, 0, -42]} name="Chasm Shrine" />
 
       {/* ============================================================== */}
       {/* 4. ROOM 2: ELITE SANCTUM (Z: -41 to -72)                      */}
@@ -374,9 +392,20 @@ export const ForgottenCrypt = () => {
       {/* Mystic Gate 2 leading to Catacombs at Z = -72 */}
       <MysticDungeonGate position={[0, 0, -72]} isOpen={roomsUnlocked[2]} roomNumber={2} />
 
+      {/* Room 2 Clues */}
+      <BloodSplatter position={[0, 0.28, -56.5]} scale={1.5} rotation={1.2} />
+
       {/* ============================================================== */}
       {/* 5. ROOM 3: FLOODED CATACOMBS (Z: -73 to -108)                 */}
       {/* ============================================================== */}
+      {/* Safe Point Altar before Boss Chamber */}
+      <AncientSaveShrine position={[10.5, 0, -75]} name="Catacomb Safe Shrine" />
+
+      {/* Environmental Clues */}
+      <VoidRiftClue position={[-12.5, 0, -88]} />
+      <BloodSplatter position={[4.5, 0, -84]} scale={1.2} rotation={-0.6} />
+      <WallClawScratches position={[14.4, 2.5, -92]} rotation={[0, -Math.PI / 2, 0]} />
+
       {/* Floor */}
       <mesh position={[0, -0.05, -90.5]} receiveShadow rotation={[-Math.PI / 2, 0, 0]} material={floorMaterial}>
         <planeGeometry args={[30, 35]} />

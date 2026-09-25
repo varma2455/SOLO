@@ -1,9 +1,13 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
 import { globalPlayerState } from '../player/Player';
 import { sound } from '../../audio/soundManager';
+import { safeVector3, DEFAULT_PLAYER_POSITION } from '../../utils/vector3';
+import { registerEnemyPosition, unregisterEnemyPosition } from '../combat/EnemyPositionTracker';
+import { buildAbyssWardenModel } from '../enemies/MonsterModelBuilder';
+import { MonsterAnimationController } from '../enemies/MonsterAnimationController';
 
 const _bossPPos = new THREE.Vector3();
 const _bossDir = new THREE.Vector3();
@@ -23,6 +27,30 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
   const [showTelegraph, setShowTelegraph] = useState(false);
   const [telegraphPos, setTelegraphPos] = useState([0, 0, 0]);
 
+  // Procedural anatomical 3D Abyss Warden titan model and skeletal animation controller
+  const { rootModel, nodes, animController } = useMemo(() => {
+    const res = buildAbyssWardenModel();
+    const anim = new MonsterAnimationController(res.nodes, 'boss');
+    return { rootModel: res.root, nodes: res.nodes, animController: anim };
+  }, []);
+
+  // Dispose memory on unmount
+  useEffect(() => {
+    return () => {
+      if (rootModel) {
+        rootModel.traverse((child) => {
+          if (child.isMesh) {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+              else child.material.dispose();
+            }
+          }
+        });
+      }
+    };
+  }, [rootModel]);
+
   // Boss location centered in the grand hypostyle arena
   const pos = useRef(new THREE.Vector3(0, 0, -140));
   const rotation = useRef(0);
@@ -30,6 +58,7 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
   const specialTimer = useRef(7.0);
   const hasSummonedAdds = useRef(false);
   const hasRoaredAwakening = useRef(false);
+  const prevHp = useRef(bossHp);
 
   // Awakening roar on first load
   useEffect(() => {
@@ -39,16 +68,29 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     }
   }, []);
 
-  // Monitor Boss HP
+  // Monitor Boss HP & trigger flinch on damage
   useEffect(() => {
+    if (bossHp < prevHp.current) {
+      animController?.triggerHit(0.24);
+    }
+    prevHp.current = bossHp;
+
     if (bossHp <= 0 && aiState !== 'DEAD') {
       setAiState('DEAD');
+      unregisterEnemyPosition('abyssWarden');
       sound.playBossRoar();
       if (onBossDefeated) {
         onBossDefeated([pos.current.x, 0.5, pos.current.z]);
       }
     }
-  }, [bossHp]);
+  }, [bossHp, aiState, onBossDefeated, animController]);
+
+  // Clean up boss tracking on unmount
+  useEffect(() => {
+    return () => {
+      unregisterEnemyPosition('abyssWarden');
+    };
+  }, []);
 
   // Phase 2 Minion summoning trigger
   useEffect(() => {
@@ -74,8 +116,9 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
 
     if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
       _bossPPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
-    } else if (playerPos) {
-      _bossPPos.set(playerPos[0], playerPos[1], playerPos[2]);
+    } else {
+      const curP = safeVector3(playerPos, DEFAULT_PLAYER_POSITION, 'AbyssWardenBoss:playerPos');
+      _bossPPos.set(curP[0], curP[1], curP[2]);
     }
 
     const distToPlayer = pos.current.distanceTo(_bossPPos);
@@ -87,8 +130,10 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     if (bossPhase >= 3 && specialTimer.current <= 0 && distToPlayer < 24) {
       specialTimer.current = bossRage ? 5.5 : 9.0;
       setAiState('TELEGRAPH');
+      animController?.triggerAttack();
       setShowTelegraph(true);
-      setTelegraphPos([_bossPPos.x, 0.05, _bossPPos.z]);
+      const safeTel = [_bossPPos.x, 0.05, _bossPPos.z];
+      setTelegraphPos(safeTel);
       sound.playBossRoar();
 
       setTimeout(() => {
@@ -96,7 +141,8 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
         if (aiState !== 'DEAD') {
           sound.playVoidBurst();
           const pCurrent = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _bossPPos) : _bossPPos;
-          _bossSlamTarget.set(telegraphPos[0], 0, telegraphPos[2]);
+          const [tx, , tz] = safeVector3(safeTel, [0, 0, -140], 'AbyssWardenBoss:slamTarget');
+          _bossSlamTarget.set(tx, 0, tz);
           const slamDist = pCurrent.distanceTo(_bossSlamTarget);
           if (slamDist <= 7.5) {
             onBossAttackPlayer(bossRage ? 65 : 45);
@@ -112,6 +158,7 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
         if (attackTimer.current <= 0) {
           attackTimer.current = bossRage ? 1.1 : 1.9;
           setAiState('ATTACK');
+          animController?.triggerAttack();
 
           if (swordRef.current) {
             swordRef.current.rotation.x = -2.2;
@@ -143,6 +190,18 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     // Apply movement
     meshRef.current.position.copy(pos.current);
     meshRef.current.rotation.y = rotation.current;
+
+    // Update procedural skeletal animation machine
+    const isMoving = aiState === 'CHASE';
+    const isDead = aiState === 'DEAD' || bossHp <= 0;
+    animController?.update(dt, isMoving, isDead, true, bossRage);
+
+    registerEnemyPosition('abyssWarden', [pos.current.x, pos.current.y, pos.current.z], bossHp, bossMaxHp, {
+      isBoss: true,
+      name: 'Abyss Warden',
+      role: 'boss',
+      tier: 'boss'
+    });
 
     // Rage aura pulse
     if (auraRef.current) {
@@ -190,103 +249,8 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
           />
         </mesh>
 
-        {/* Boss Scale 2.5 */}
-        <group scale={2.5}>
-          {/* Spiked Obsidian Armored Torso */}
-          <mesh position={[0, 1.25, 0]}>
-            <boxGeometry args={[0.95, 1.4, 0.65]} />
-            <meshStandardMaterial
-              color={bossRage ? '#450a0a' : '#0b0b12'}
-              metalness={0.92}
-              roughness={0.35}
-            />
-          </mesh>
-
-          {/* Glowing Abyssal Void Core in Chest */}
-          <mesh position={[0, 1.42, 0.35]}>
-            <octahedronGeometry args={[0.22]} />
-            <meshBasicMaterial color={bossRage ? '#f43f5e' : '#c084fc'} />
-          </mesh>
-
-          {/* Demonic Horned Greathelm Crown */}
-          <group position={[0, 2.2, 0.05]}>
-            <mesh position={[0, 0, 0]}>
-              <boxGeometry args={[0.58, 0.58, 0.58]} />
-              <meshStandardMaterial color="#050508" metalness={0.9} roughness={0.3} />
-            </mesh>
-            {/* Crown Spikes */}
-            {[-0.2, 0, 0.2].map((x, i) => (
-              <mesh key={i} position={[x, 0.38, 0]}>
-                <coneGeometry args={[0.07, 0.35, 4]} />
-                <meshStandardMaterial color="#1e1b4b" metalness={0.8} />
-              </mesh>
-            ))}
-            {/* Colossal Sweeping Horns */}
-            <mesh position={[-0.45, 0.45, 0]} rotation={[0, 0, 0.65]}>
-              <coneGeometry args={[0.16, 1.1, 8]} />
-              <meshStandardMaterial color="#1e1b4b" metalness={0.7} />
-            </mesh>
-            <mesh position={[0.45, 0.45, 0]} rotation={[0, 0, -0.65]}>
-              <coneGeometry args={[0.16, 1.1, 8]} />
-              <meshStandardMaterial color="#1e1b4b" metalness={0.7} />
-            </mesh>
-            {/* Demon Visor Glowing Eyes */}
-            <mesh position={[-0.15, 0.06, 0.32]}>
-              <boxGeometry args={[0.11, 0.06, 0.04]} />
-              <meshBasicMaterial color={bossRage ? '#ff0000' : '#d946ef'} />
-            </mesh>
-            <mesh position={[0.15, 0.06, 0.32]}>
-              <boxGeometry args={[0.11, 0.06, 0.04]} />
-              <meshBasicMaterial color={bossRage ? '#ff0000' : '#d946ef'} />
-            </mesh>
-          </group>
-
-          {/* Right Arm & Colossal Abyssal Cleaver */}
-          <group position={[0.7, 1.35, 0]}>
-            <mesh position={[0, -0.4, 0]}>
-              <boxGeometry args={[0.32, 0.95, 0.32]} />
-              <meshStandardMaterial color="#0b0b12" metalness={0.85} />
-            </mesh>
-            {/* Cleaver Greatblade */}
-            <group ref={swordRef} position={[0, -0.85, 0.4]}>
-              <mesh position={[0, 0.8, 0]}>
-                <boxGeometry args={[0.14, 2.1, 0.42]} />
-                <meshStandardMaterial
-                  color="#1e1b4b"
-                  metalness={0.92}
-                  roughness={0.25}
-                />
-              </mesh>
-              {/* Glowing Runic Edge */}
-              <mesh position={[0, 0.8, 0.22]}>
-                <boxGeometry args={[0.07, 2.05, 0.06]} />
-                <meshBasicMaterial color={bossRage ? '#ef4444' : '#c084fc'} />
-              </mesh>
-            </group>
-          </group>
-
-          {/* Left Arm & Heavy Pauldron */}
-          <group position={[-0.7, 1.35, 0]}>
-            <mesh position={[0, -0.4, 0]}>
-              <boxGeometry args={[0.32, 0.95, 0.32]} />
-              <meshStandardMaterial color="#0b0b12" metalness={0.85} />
-            </mesh>
-            <mesh position={[-0.12, 0.25, 0]}>
-              <boxGeometry args={[0.5, 0.45, 0.5]} />
-              <meshStandardMaterial color="#2e1065" metalness={0.8} />
-            </mesh>
-          </group>
-
-          {/* Armored Heavy Greaves */}
-          <mesh position={[-0.26, 0.32, 0]}>
-            <boxGeometry args={[0.32, 0.85, 0.38]} />
-            <meshStandardMaterial color="#050508" roughness={0.8} />
-          </mesh>
-          <mesh position={[0.26, 0.32, 0]}>
-            <boxGeometry args={[0.32, 0.85, 0.38]} />
-            <meshStandardMaterial color="#050508" roughness={0.8} />
-          </mesh>
-        </group>
+        {/* Procedural 3D Boss Model (~4.5m Imposing Titan) */}
+        <primitive object={rootModel} />
       </group>
     </>
   );

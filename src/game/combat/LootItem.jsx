@@ -1,38 +1,57 @@
+// -------------------------------------------------------------
+// SHADOW ASCENSION - 3D LOOT ITEMS & SOUL EXTRACTION BEACONS
+// Crash-safe vector validation, magnetic pickup, and soul interaction
+// -------------------------------------------------------------
+
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
+import { globalPlayerState } from '../player/Player';
+import { safeVector3, DEFAULT_PLAYER_POSITION } from '../../utils/vector3';
+
+const _lootPlayerPos = new THREE.Vector3();
+const _lootPullDir = new THREE.Vector3();
+const _beaconPlayerPos = new THREE.Vector3();
+const _beaconPos = new THREE.Vector3();
 
 export const LootItem = ({ loot, playerPos, onCollect }) => {
   const meshRef = useRef();
-  const pos = useRef(new THREE.Vector3(...loot.position));
+  const safeLootPos = safeVector3(loot?.position, [0, 0.5, 0], 'LootItem:pos');
+  const pos = useRef(new THREE.Vector3(safeLootPos[0], safeLootPos[1], safeLootPos[2]));
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
 
     // Floating and spinning animation
-    meshRef.current.position.y = loot.position[1] + Math.sin(t * 4 + loot.position[0]) * 0.15;
+    meshRef.current.position.y = safeLootPos[1] + Math.sin(t * 4 + safeLootPos[0]) * 0.15;
     meshRef.current.rotation.y += delta * 2.5;
 
     // Check distance to player for auto-pickup
-    const pPos = new THREE.Vector3(...playerPos);
-    const dist = pos.current.distanceTo(pPos);
+    if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
+      _lootPlayerPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
+    } else {
+      const p = safeVector3(playerPos, DEFAULT_PLAYER_POSITION, 'LootItem:playerPos');
+      _lootPlayerPos.set(p[0], p[1], p[2]);
+    }
+
+    const dist = pos.current.distanceTo(_lootPlayerPos);
 
     if (dist <= 2.2) {
-      onCollect(loot);
-    } else if (dist <= 5.0) {
+      if (onCollect && loot) onCollect(loot);
+    } else if (dist <= 5.5) {
       // Magnetic pull towards player
-      const pullDir = new THREE.Vector3().subVectors(pPos, pos.current).normalize();
-      pos.current.addScaledVector(pullDir, 8.0 * delta);
+      _lootPullDir.subVectors(_lootPlayerPos, pos.current).normalize();
+      pos.current.addScaledVector(_lootPullDir, 8.5 * delta);
       meshRef.current.position.copy(pos.current);
     }
   });
 
-  const color = loot.rarityColor || '#fbbf24';
+  const color = loot?.rarityColor || '#fbbf24';
 
   return (
-    <group ref={meshRef} position={loot.position}>
+    <group ref={meshRef} position={safeLootPos}>
       {/* Glowing Loot Crystal */}
       <mesh>
         <octahedronGeometry args={[0.25]} />
@@ -53,18 +72,27 @@ export const LootItem = ({ loot, playerPos, onCollect }) => {
 };
 
 // Soul Extraction Essence Beacon
-export const ExtractionBeacon = ({ beacon, playerPos, onTriggerExtract }) => {
+export const ExtractionBeacon = ({ beacon, playerPos }) => {
   const meshRef = useRef();
+  const safeBeaconPos = safeVector3(beacon?.position, [0, 0.1, 0], 'ExtractionBeacon:pos');
 
   useFrame((state, delta) => {
-    if (!meshRef.current) return;
+    if (!meshRef.current || !beacon) return;
     const t = state.clock.getElapsedTime();
     meshRef.current.rotation.y += delta * 1.5;
 
     // Distance check to activate interaction prompt
-    const pPos = new THREE.Vector3(...playerPos);
-    const dist = new THREE.Vector3(...beacon.position).distanceTo(pPos);
-    if (dist <= 3.5) {
+    if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
+      _beaconPlayerPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
+    } else {
+      const p = safeVector3(playerPos, DEFAULT_PLAYER_POSITION, 'ExtractionBeacon:playerPos');
+      _beaconPlayerPos.set(p[0], p[1], p[2]);
+    }
+
+    _beaconPos.set(safeBeaconPos[0], safeBeaconPos[1], safeBeaconPos[2]);
+    const dist = _beaconPos.distanceTo(_beaconPlayerPos);
+
+    if (dist <= 3.8) {
       useGameStore.setState({
         extractionTarget: beacon
       });
@@ -76,7 +104,7 @@ export const ExtractionBeacon = ({ beacon, playerPos, onTriggerExtract }) => {
   });
 
   return (
-    <group ref={meshRef} position={beacon.position}>
+    <group ref={meshRef} position={safeBeaconPos}>
       {/* Swirling Soul Vortex */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.6, 1.6, 24]} />

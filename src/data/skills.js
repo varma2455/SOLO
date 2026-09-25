@@ -30,7 +30,7 @@ export const SKILLS = {
   phantomStep: {
     id: 'phantomStep',
     name: 'Phantom Step',
-    key: 'SPACE',
+    key: 'E',
     description: 'Dissolve into shadows, dashing forward at high velocity with 0.6s of complete invulnerability.',
     cooldown: 2.2,
     manaCost: 15,

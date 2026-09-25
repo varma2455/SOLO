@@ -1,9 +1,12 @@
 // -------------------------------------------------------------
-// SHADOW ASCENSION - ENEMY MANAGER WITH DYNAMIC ENCOUNTERS
-// Coordinates multi-tier waves, commanders, ambushes, and finishers
+// SHADOW ASCENSION - ENEMY MANAGER WITH EXPLORE-FIRST SYSTEM
+// Supports: Dormant exploration preview, proximity monster discovery,
+// and dedicated battle arena combat activation.
 // -------------------------------------------------------------
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
 import { ENEMY_TYPES } from '../../data/enemies';
 import { generateDungeonEncounters } from '../encounters/EncounterManager';
@@ -13,6 +16,9 @@ import { Enemy } from './Enemy';
 import { AbyssWardenBoss } from '../bosses/AbyssWardenBoss';
 import { LootItem, ExtractionBeacon } from '../combat/LootItem';
 import { sound } from '../../audio/soundManager';
+import { globalPlayerState } from '../player/Player';
+import { safeVector3, DEFAULT_PLAYER_POSITION } from '../../utils/vector3';
+import { getEnemyPosition } from '../combat/EnemyPositionTracker';
 
 export const EnemyManager = ({
   playerPos,
@@ -24,6 +30,10 @@ export const EnemyManager = ({
   // Store actions & state
   const dungeon = useGameStore((s) => s.dungeon);
   const player = useGameStore((s) => s.player);
+  const gameFlowState = useGameStore((s) => s.gameFlowState);
+  const activeEncounter = useGameStore((s) => s.activeEncounter);
+  const discoverMonster = useGameStore((s) => s.discoverMonster);
+  const onEncounterVictory = useGameStore((s) => s.onEncounterVictory);
   const recordMonsterDefeated = useGameStore((s) => s.recordMonsterDefeated);
   const gainXp = useGameStore((s) => s.gainXp);
   const gainGold = useGameStore((s) => s.gainGold);
@@ -35,10 +45,11 @@ export const EnemyManager = ({
   const executionEvent = useGameStore((s) => s.executionEvent);
   const setExecutableEnemyId = useGameStore((s) => s.setExecutableEnemyId);
 
-  // Active enemies list
+  // Active enemies list in current scene
   const [enemies, setEnemies] = useState([]);
   const [loots, setLoots] = useState([]);
   const [beacons, setBeacons] = useState([]);
+  const frameCounter = useRef(0);
 
   // Check if any commander is alive to broadcast commander aura buff
   const isCommanderAlive = useMemo(() => {
@@ -50,23 +61,67 @@ export const EnemyManager = ({
     if (!onLivingEnemiesChange) return;
     const living = enemies
       .filter((e) => e.hp > 0)
-      .map((e) => ({ id: e.id, position: e.spawnPosition, hp: e.hp }));
+      .map((e) => ({
+        id: e.id,
+        position: safeVector3(e.spawnPosition, [0, 0, 0], 'EnemyManager:livingEnemies'),
+        hp: e.hp
+      }));
     if (dungeon.bossActive && dungeon.bossHp > 0) {
-      living.push({ id: 'abyssWarden', position: [0, 0, -140], hp: dungeon.bossHp });
+      living.push({ id: 'abyssWarden', position: [0, 0, -138], hp: dungeon.bossHp });
     }
     onLivingEnemiesChange(living);
   }, [enemies, dungeon.bossActive, dungeon.bossHp, onLivingEnemiesChange]);
 
-  // Initialize or reload enemies whenever dungeon encounters are generated
+  // Synchronize enemies whenever dungeon encounters or state change
   useEffect(() => {
-    const enc = dungeon.encounters || generateDungeonEncounters(dungeon.rank || 'E', player.level || 1);
-    const initialList = [];
-    if (enc[1]?.enemies) initialList.push(...enc[1].enemies);
-    if (enc[2]?.enemies) initialList.push(...enc[2].enemies);
-    if (enc[3]?.enemies) initialList.push(...enc[3].enemies);
+    const encMap = dungeon.encounters || generateDungeonEncounters(dungeon.rank || 'E', player.level || 1, dungeon.seed || 133789);
+    const encState = dungeon.encountersState || {};
+    const visibleEnemies = [];
 
-    setEnemies(initialList);
-  }, [dungeon.encounters]);
+    // For rooms 1, 2, 3: render enemies if the encounter is NOT defeated
+    for (let r = 1; r <= 3; r++) {
+      const enc = encMap[r];
+      if (enc && !encState[enc.id]?.defeated && !enc.defeated) {
+        if (enc.enemies) {
+          visibleEnemies.push(...enc.enemies);
+        }
+      }
+    }
+
+    setEnemies(visibleEnemies);
+  }, [dungeon.encounters, dungeon.encountersState, dungeon.seed, dungeon.rank]);
+
+  // Proximity Detection Loop: checks distance to undefeated monsters during EXPLORING mode
+  useFrame(() => {
+    if (gameFlowState !== 'EXPLORING') return;
+
+    frameCounter.current++;
+    // Throttled check every 8 frames (~7.5 Hz) for zero performance impact
+    if (frameCounter.current % 8 !== 0) return;
+
+    const pPos = globalPlayerState?.pos || new THREE.Vector3(0, 0.5, 24);
+    const encMap = dungeon.encounters;
+    const encState = dungeon.encountersState || {};
+    if (!encMap) return;
+
+    // Check each room's encounter
+    for (const enc of Object.values(encMap)) {
+      if (!enc || enc.defeated || encState[enc.id]?.defeated) continue;
+
+      // Don't check rooms far away
+      if (Math.abs(enc.roomIndex - dungeon.currentRoom) > 1) continue;
+
+      const center = safeVector3(enc.encounterCenter, [0, 0, 0], 'EnemyManager:encounterCenter');
+      const dx = pPos.x - center[0];
+      const dz = pPos.z - center[2];
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist <= enc.discoveryDistance) {
+        discoverMonster(enc);
+        break;
+      }
+    }
+  });
 
   // Listen for wave reinforcement spawns (e.g. Swarm Wave 2/3)
   useEffect(() => {
@@ -83,7 +138,8 @@ export const EnemyManager = ({
     setEnemies((prev) =>
       prev.map((en) => {
         if (en.id === target.id && en.hp > 0) {
-          addDamageText(9999, [en.spawnPosition[0], 2.4, en.spawnPosition[2]], true);
+          const enPos = safeVector3(en.spawnPosition, [0, 1.5, 0], 'EnemyManager:execution');
+          addDamageText(9999, [enPos[0], 2.4, enPos[2]], true);
           return { ...en, hp: 0 };
         }
         return en;
@@ -93,19 +149,19 @@ export const EnemyManager = ({
 
   // Handle incoming attacks from summoned Shadow companions
   useEffect(() => {
-    if (!shadowAttackEvent) return;
+    if (!shadowAttackEvent || gameFlowState !== 'BATTLE') return;
     handleShadowAttackEnemy(shadowAttackEvent.shadow, shadowAttackEvent.enemyId, shadowAttackEvent.power);
-  }, [shadowAttackEvent]);
+  }, [shadowAttackEvent, gameFlowState]);
 
-  // Process Basic Attack Hits
+  // Process Basic Attack Hits (Only active during BATTLE)
   useEffect(() => {
-    if (!combatAttackEvent) return;
+    if (!combatAttackEvent || gameFlowState !== 'BATTLE') return;
     const { position, angle, multiplier, range } = combatAttackEvent;
 
     // Check hit on Boss
     if (dungeon.bossActive && dungeon.bossHp > 0) {
-      const bossPos = [0, 0, -140];
-      const isBossHit = checkConeCollision(position, angle, bossPos, range + 2.4, 75);
+      const bossPos = getEnemyPosition('abyssWarden', [0, 0, -138]);
+      const isBossHit = checkConeCollision(position, angle, bossPos, range + 2.8, 85);
       if (isBossHit) {
         const { damage, isCrit } = calculatePlayerDamage(multiplier);
         sound.playHit(isCrit);
@@ -114,35 +170,37 @@ export const EnemyManager = ({
       }
     }
 
-    // Check hit on regular enemies
+    // Check hit on regular enemies of active encounter
     setEnemies((prev) =>
       prev.map((en) => {
         if (en.hp <= 0) return en;
 
-        const isHit = checkConeCollision(position, angle, en.spawnPosition, range, 75);
+        const livePos = getEnemyPosition(en.id, en.spawnPosition);
+        const enPos = safeVector3(livePos, [0, 1.5, 0], 'EnemyManager:combatHit');
+        const isHit = checkConeCollision(position, angle, enPos, range, 85);
         if (isHit) {
           const { damage, isCrit } = calculatePlayerDamage(multiplier);
           sound.playHit(isCrit);
-          addDamageText(damage, [en.spawnPosition[0], 1.5, en.spawnPosition[2]], isCrit);
+          addDamageText(damage, [enPos[0], 1.5, enPos[2]], isCrit);
           return { ...en, hp: Math.max(0, en.hp - damage) };
         }
         return en;
       })
     );
-  }, [combatAttackEvent, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
+  }, [combatAttackEvent, gameFlowState, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
 
   // Process Skill Hits (Shadow Slash, Void Burst, Eclipse Dominion)
   useEffect(() => {
-    if (!skillEvent) return;
+    if (!skillEvent || gameFlowState !== 'BATTLE') return;
     const { skillId, position, angle, range, multiplier } = skillEvent;
 
     // Hit Boss with skill
     if (dungeon.bossActive && dungeon.bossHp > 0) {
-      const bossPos = [0, 0, -140];
+      const bossPos = getEnemyPosition('abyssWarden', [0, 0, -138]);
       let bossHit = false;
 
       if (skillId === 'shadowSlash') {
-        bossHit = checkConeCollision(position, angle, bossPos, range + 2.5, 60);
+        bossHit = checkConeCollision(position, angle, bossPos, range + 2.5, 75);
       } else {
         bossHit = checkCircleCollision(position, bossPos, range + 3.0);
       }
@@ -160,31 +218,34 @@ export const EnemyManager = ({
       prev.map((en) => {
         if (en.hp <= 0) return en;
 
+        const livePos = getEnemyPosition(en.id, en.spawnPosition);
+        const enPos = safeVector3(livePos, [0, 1.5, 0], 'EnemyManager:skillHit');
         let hit = false;
         if (skillId === 'shadowSlash') {
-          hit = checkConeCollision(position, angle, en.spawnPosition, range, 60);
+          hit = checkConeCollision(position, angle, enPos, range, 75);
         } else {
-          hit = checkCircleCollision(position, en.spawnPosition, range);
+          hit = checkCircleCollision(position, enPos, range);
         }
 
         if (hit) {
           const { damage, isCrit } = calculatePlayerDamage(multiplier);
           sound.playHit(isCrit);
-          addDamageText(damage, [en.spawnPosition[0], 1.6, en.spawnPosition[2]], isCrit);
+          addDamageText(damage, [enPos[0], 1.6, enPos[2]], isCrit);
           return { ...en, hp: Math.max(0, en.hp - damage) };
         }
         return en;
       })
     );
-  }, [skillEvent, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
+  }, [skillEvent, gameFlowState, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
 
   // Shadow Minions attacking enemies
   const handleShadowAttackEnemy = (shadow, enemyId, attackPower) => {
     setEnemies((prev) =>
       prev.map((en) => {
         if (en.id === enemyId && en.hp > 0) {
+          const enPos = safeVector3(en.spawnPosition, [0, 1.5, 0], 'EnemyManager:shadowAtk');
           const dmg = Math.round(attackPower * (0.9 + Math.random() * 0.2));
-          addDamageText(dmg, [en.spawnPosition[0], 1.4, en.spawnPosition[2]], false);
+          addDamageText(dmg, [enPos[0], 1.4, enPos[2]], false);
           return { ...en, hp: Math.max(0, en.hp - dmg) };
         }
         return en;
@@ -194,16 +255,17 @@ export const EnemyManager = ({
     // If attacking boss
     if (enemyId === 'abyssWarden' && dungeon.bossActive && dungeon.bossHp > 0) {
       const dmg = Math.round(attackPower * (0.9 + Math.random() * 0.2));
-      addDamageText(dmg, [0, 3.0, -140], false);
+      addDamageText(dmg, [0, 3.0, -138], false);
       updateBossHp(dungeon.bossHp - dmg);
     }
   };
 
   // Enemy Death Handler
   const handleEnemyDeath = useCallback((enemy, deathPos) => {
+    const safeDeath = safeVector3(deathPos, [0, 0.5, 0], 'EnemyManager:enemyDeath');
     gainXp(enemy.xpReward || 35);
     gainGold(enemy.goldReward || 15);
-    recordMonsterDefeated(enemy.id, deathPos);
+    recordMonsterDefeated(enemy.id, safeDeath);
 
     // Spawn Loot Crystal
     const droppedItems = getRandomLoot(enemy.id?.split('_')[0] || 'ashGoblin');
@@ -212,7 +274,7 @@ export const EnemyManager = ({
       ...prev,
       {
         id: lootId,
-        position: [deathPos[0], 0.6, deathPos[2]],
+        position: [safeDeath[0], 0.6, safeDeath[2]],
         items: droppedItems,
         rarityColor: enemy.tier === 'commander' ? '#f97316' : enemy.tier === 'elite' ? '#38bdf8' : '#fbbf24'
       }
@@ -229,7 +291,7 @@ export const EnemyManager = ({
           name: enemy.shadowName || enemy.name,
           rank: enemy.shadowRank || enemy.rank,
           shadowId: enemy.shadowName?.toLowerCase().replace(/\s+/g, '_') || 'shadow_stalker',
-          position: [deathPos[0], 0.1, deathPos[2]]
+          position: [safeDeath[0], 0.1, safeDeath[2]]
         }
       ]);
     }
@@ -237,6 +299,7 @@ export const EnemyManager = ({
 
   // Boss Defeated Handler
   const handleBossDefeated = useCallback((deathPos) => {
+    const safeDeath = safeVector3(deathPos, [0, 0.8, -138], 'EnemyManager:bossDefeated');
     gainXp(4500);
     gainGold(2400);
     const bossLoot = getRandomLoot('abyssWarden');
@@ -244,7 +307,7 @@ export const EnemyManager = ({
       ...prev,
       {
         id: 'boss_loot',
-        position: [deathPos[0], 0.8, deathPos[2]],
+        position: [safeDeath[0], 0.8, safeDeath[2]],
         items: bossLoot,
         rarityColor: '#f43f5e'
       }
@@ -253,10 +316,10 @@ export const EnemyManager = ({
 
   // Boss Phase 2 & 3 summons
   const handleSpawnBossMinions = useCallback((positions) => {
-    const newAdds = positions.map((pos, idx) => ({
+    const newAdds = (positions || []).map((pos, idx) => ({
       id: `boss_add_${Date.now()}_${idx}`,
       ...ENEMY_TYPES.boneReaver,
-      spawnPosition: pos,
+      spawnPosition: safeVector3(pos, [0, 0.5, -138], 'bossMinions'),
       hp: ENEMY_TYPES.boneReaver.baseHp || 180,
       maxHp: ENEMY_TYPES.boneReaver.baseHp || 180,
       room: 4
@@ -273,43 +336,59 @@ export const EnemyManager = ({
     setLoots((prev) => prev.filter((l) => l.id !== loot.id));
   }, [addItemToInventory]);
 
-  // Enemy attacks player
+  // Enemy attacks player (Only damages player during BATTLE)
   const handleEnemyAttackPlayer = useCallback((damage) => {
+    if (useGameStore.getState().gameFlowState !== 'BATTLE') return;
     const actual = takeDamage(damage);
     if (actual > 0) {
-      addDamageText(`-${actual}`, playerPos, false, true);
+      const p = globalPlayerState?.pos || (playerPos ? safeVector3(playerPos, DEFAULT_PLAYER_POSITION) : null);
+      const safeP = p ? [p.x ?? p[0] ?? 0, (p.y ?? p[1] ?? 0.5) + 1.2, p.z ?? p[2] ?? 24] : [0, 1.7, 24];
+      addDamageText(`-${actual}`, safeP, false, true);
     }
   }, [takeDamage, addDamageText, playerPos]);
 
   // Finisher target proximity
   const handleNearExecutable = useCallback((enemyId, isNear) => {
-    if (isNear) {
+    if (isNear && gameFlowState === 'BATTLE') {
       const target = enemies.find((e) => e.id === enemyId);
       if (target) setExecutableEnemyId(target);
     } else {
       setExecutableEnemyId(null);
     }
-  }, [enemies, setExecutableEnemyId]);
+  }, [enemies, gameFlowState, setExecutableEnemyId]);
+
+  // Determine whether an enemy is dormant:
+  // An enemy is ONLY active when gameFlowState === 'BATTLE' and it belongs to the active encounter.
+  const isEncounterActiveInBattle = (enemy) => {
+    if (gameFlowState !== 'BATTLE' || !activeEncounter) return false;
+    return enemy.room === activeEncounter.roomIndex;
+  };
+
+  const currentPPos = playerPos || globalPlayerState?.position || DEFAULT_PLAYER_POSITION;
 
   return (
     <group>
-      {/* Dynamic Enemies */}
-      {enemies.map((en) => (
-        <Enemy
-          key={en.id}
-          enemyData={en}
-          playerPos={playerPos}
-          onEnemyDeath={handleEnemyDeath}
-          onEnemyAttackPlayer={handleEnemyAttackPlayer}
-          commanderAlive={isCommanderAlive}
-          onNearExecutable={handleNearExecutable}
-        />
-      ))}
+      {/* Enemies in the dungeon */}
+      {enemies.map((en) => {
+        const isBattleActive = isEncounterActiveInBattle(en);
+        return (
+          <Enemy
+            key={en.id}
+            enemyData={en}
+            playerPos={currentPPos}
+            onEnemyDeath={handleEnemyDeath}
+            onEnemyAttackPlayer={handleEnemyAttackPlayer}
+            commanderAlive={isCommanderAlive}
+            onNearExecutable={handleNearExecutable}
+            isDormant={!isBattleActive}
+          />
+        );
+      })}
 
-      {/* Boss Abyss Warden */}
+      {/* Boss Abyss Warden in Room 4 */}
       {dungeon.bossActive && dungeon.bossHp > 0 && (
         <AbyssWardenBoss
-          playerPos={playerPos}
+          playerPos={currentPPos}
           onBossAttackPlayer={handleEnemyAttackPlayer}
           onBossDefeated={handleBossDefeated}
           onSpawnMinions={handleSpawnBossMinions}
@@ -318,12 +397,12 @@ export const EnemyManager = ({
 
       {/* Loot Drops */}
       {loots.map((loot) => (
-        <LootItem key={loot.id} loot={loot} playerPos={playerPos} onCollect={handleCollectLoot} />
+        <LootItem key={loot.id} loot={loot} playerPos={currentPPos} onCollect={handleCollectLoot} />
       ))}
 
       {/* Soul Extraction Beacons */}
       {beacons.map((beacon) => (
-        <ExtractionBeacon key={beacon.id} beacon={beacon} playerPos={playerPos} />
+        <ExtractionBeacon key={beacon.id} beacon={beacon} playerPos={currentPPos} />
       ))}
     </group>
   );

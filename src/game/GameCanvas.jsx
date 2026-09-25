@@ -11,6 +11,7 @@ import { SkillEffects } from './combat/SkillEffects';
 import { DamageNumbers3D } from './combat/DamageNumbers3D';
 import { checkWebGLSupport } from '../utils/checkWebGL';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
+import { ThreeErrorBoundary } from '../utils/ThreeErrorBoundary';
 
 // Engine telemetry metrics exported for HUD performance monitor
 export const liveDebugMetrics = {
@@ -236,34 +237,47 @@ export const GameCanvas = () => {
           {/* Development Axis Helper when ?debug=true */}
           {isDebug && <axesHelper args={[2]} />}
 
-          {/* 3D Realistic Dungeon Environment */}
-          {typeof window !== 'undefined' && window.location.search.includes('simple=true') ? (
-            <SimpleTestScene />
-          ) : useFallbackScene ? (
-            <FallbackDungeon />
-          ) : (
-            <ForgottenCrypt quality={graphicsQuality} />
-          )}
+          {/* 3D Realistic Dungeon Environment with Fallback Protection */}
+          <ThreeErrorBoundary name="Dungeon" fallback={<FallbackDungeon />}>
+            {typeof window !== 'undefined' && window.location.search.includes('simple=true') ? (
+              <SimpleTestScene />
+            ) : useFallbackScene ? (
+              <FallbackDungeon />
+            ) : (
+              <ForgottenCrypt quality={graphicsQuality} />
+            )}
+          </ThreeErrorBoundary>
 
           {/* Summoned Shadows Following Player */}
-          <ShadowCompanions onShadowAttack={handleShadowAttack} livingEnemies={livingEnemies} />
+          <ThreeErrorBoundary name="ShadowCompanions">
+            <ShadowCompanions playerPos={playerPos} onShadowAttack={handleShadowAttack} livingEnemies={livingEnemies} />
+          </ThreeErrorBoundary>
 
           {/* Dynamic Dungeon Encounters & Enemies */}
-          <EnemyManager
-            combatAttackEvent={combatAttackEvent}
-            skillEvent={skillEvent}
-            shadowAttackEvent={shadowAttackEvent}
-            onLivingEnemiesChange={setLivingEnemies}
-          />
+          <ThreeErrorBoundary name="EnemyManager">
+            <EnemyManager
+              playerPos={playerPos}
+              combatAttackEvent={combatAttackEvent}
+              skillEvent={skillEvent}
+              shadowAttackEvent={shadowAttackEvent}
+              onLivingEnemiesChange={setLivingEnemies}
+            />
+          </ThreeErrorBoundary>
 
           {/* Player Kael */}
-          <Player onAttackHit={handleAttackHit} onSkillTrigger={handleSkillTrigger} />
+          <ThreeErrorBoundary name="Player">
+            <Player onAttackHit={handleAttackHit} onSkillTrigger={handleSkillTrigger} />
+          </ThreeErrorBoundary>
 
           {/* Combat FX & Slashes */}
-          <SkillEffects activeEffects={activeEffects} onEffectEnd={handleEffectEnd} />
+          <ThreeErrorBoundary name="SkillEffects">
+            <SkillEffects activeEffects={activeEffects} onEffectEnd={handleEffectEnd} />
+          </ThreeErrorBoundary>
 
           {/* 3D Floating Combat Text */}
-          <DamageNumbers3D />
+          <ThreeErrorBoundary name="DamageNumbers3D">
+            <DamageNumbers3D />
+          </ThreeErrorBoundary>
         </Canvas>
       </ErrorBoundary>
     </div>

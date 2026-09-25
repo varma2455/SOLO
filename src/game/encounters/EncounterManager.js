@@ -1,96 +1,39 @@
 // -------------------------------------------------------------
-// SHADOW ASCENSION - DYNAMIC ENCOUNTER MANAGER
-// Generates procedural, unpredictable dungeon room encounters
+// SHADOW ASCENSION - SEED-BASED DETERMINISTIC ENCOUNTER MANAGER
+// Generates reproducible dungeon encounters, environmental clues,
+// and discovery metadata for explore-first gameplay.
 // -------------------------------------------------------------
 
 import { ENEMY_TYPES, DUNGEON_RANKS, scaleEnemyStats } from '../../data/enemies.js';
+import { createPrng } from '../../utils/prng.js';
 
 export const ENCOUNTER_TYPES = {
-  SWARM: 'SWARM',           // 20-40 weak enemies in waves
+  SWARM: 'SWARM',           // 15-30 weak enemies in waves
   SOLO_ELITE: 'SOLO_ELITE', // 1 massive apex monster, arena duel
   SQUAD: 'SQUAD',           // 4-8 coordinated medium enemies
   MIXED: 'MIXED',           // Weak frontline + medium guards + 1 elite
-  COMMANDER: 'COMMANDER',   // 1 commander buffing 10-18 weaker monsters
-  AMBUSH: 'AMBUSH',         // Enemies surge from dark corners after entry
-  BOSS: 'BOSS'              // Multi-phase boss + minion waves
+  COMMANDER: 'COMMANDER',   // 1 commander buffing minions
+  AMBUSH: 'AMBUSH',         // Hidden enemies springing a trap
+  BOSS: 'BOSS'              // Multi-phase sovereign boss
 };
 
-// Room physical boundary definitions for spawn coordinate generation
+// Physical boundaries for rooms
 const ROOM_BOUNDS = {
-  1: { xMin: -11, xMax: 11, zMin: -24, zMax: 4, floorY: 0 },
-  2: { xMin: -10, xMax: 10, zMin: -68, zMax: -45, floorY: 0 },
-  3: { xMin: -12, xMax: 12, zMin: -104, zMax: -76, floorY: 0 },
-  4: { xMin: -18, xMax: 18, zMin: -160, zMax: -115, floorY: 0 }
+  1: { xMin: -11, xMax: 11, zMin: -24, zMax: 4, floorY: 0, centerZ: -10 },
+  2: { xMin: -10, xMax: 10, zMin: -68, zMax: -45, floorY: 0, centerZ: -56.5 },
+  3: { xMin: -12, xMax: 12, zMin: -104, zMax: -76, floorY: 0, centerZ: -90.5 },
+  4: { xMin: -18, xMax: 18, zMin: -160, zMax: -115, floorY: 0, centerZ: -136 }
 };
 
 /**
- * Generate logical spawn positions inside a room avoiding player entry point
- */
-function generateSpawnPoints(roomIndex, count, pattern = 'scatter') {
-  const bounds = ROOM_BOUNDS[roomIndex] || ROOM_BOUNDS[1];
-  const points = [];
-  const minDistance = 2.0;
-
-  for (let i = 0; i < count; i++) {
-    let attempts = 0;
-    let pos = null;
-
-    while (attempts < 20) {
-      attempts++;
-      let x, z;
-
-      if (pattern === 'ambush') {
-        // Spawn near room edges / side walls / alcoves
-        const side = Math.random() > 0.5 ? 1 : -1;
-        x = side * (bounds.xMax - 1 - Math.random() * 2.5);
-        z = bounds.zMin + 2 + Math.random() * (bounds.zMax - bounds.zMin - 4);
-      } else if (pattern === 'ring') {
-        // Circular perimeter around center
-        const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-        const radius = 6.0 + Math.random() * 4.5;
-        const centerX = 0;
-        const centerZ = (bounds.zMin + bounds.zMax) / 2;
-        x = Math.max(bounds.xMin + 1, Math.min(bounds.xMax - 1, centerX + Math.cos(angle) * radius));
-        z = Math.max(bounds.zMin + 1, Math.min(bounds.zMax - 1, centerZ + Math.sin(angle) * radius));
-      } else if (pattern === 'center_guard') {
-        // High density around central dais / throne
-        const centerZ = (bounds.zMin + bounds.zMax) / 2;
-        x = (Math.random() - 0.5) * 8;
-        z = centerZ + (Math.random() - 0.5) * 8;
-      } else {
-        // General scatter
-        x = bounds.xMin + 2 + Math.random() * (bounds.xMax - bounds.xMin - 4);
-        z = bounds.zMin + 2 + Math.random() * (bounds.zMax - bounds.zMin - 4);
-      }
-
-      // Check distance against already generated points
-      const tooClose = points.some(p => {
-        const dx = p[0] - x;
-        const dz = p[2] - z;
-        return Math.sqrt(dx * dx + dz * dz) < minDistance;
-      });
-
-      if (!tooClose || attempts > 15) {
-        pos = [+(x.toFixed(2)), bounds.floorY, +(z.toFixed(2))];
-        break;
-      }
-    }
-
-    if (pos) points.push(pos);
-  }
-
-  return points;
-}
-
-/**
- * Calculates danger rating (1-5 stars) and human-readable label
+ * Calculates danger rating stars, label, and formatted text
  */
 export function calculateDangerRating(totalHp, enemyCount, hasCommander, hasElite, playerLevel) {
   let score = 1;
-  if (totalHp > 1500) score = 2;
-  if (totalHp > 3500 || hasElite) score = 3;
-  if (totalHp > 6000 || hasCommander || (hasElite && enemyCount > 10)) score = 4;
-  if (totalHp > 12000 || (hasCommander && hasElite)) score = 5;
+  if (totalHp > 1400 || enemyCount > 8) score = 2;
+  if (totalHp > 3000 || hasElite) score = 3;
+  if (totalHp > 5500 || hasCommander || (hasElite && enemyCount > 6)) score = 4;
+  if (totalHp > 10000 || (hasCommander && hasElite)) score = 5;
 
   // Scale score relative to player level
   if (playerLevel >= 15 && score > 2) score = Math.max(2, score - 1);
@@ -112,9 +55,63 @@ export function calculateDangerRating(totalHp, enemyCount, hasCommander, hasElit
 }
 
 /**
- * Procedurally generates encounters for the entire dungeon
+ * Generates spawn positions using deterministic PRNG
  */
-export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
+function generateDeterministicPoints(prng, roomIndex, count, pattern = 'scatter') {
+  const bounds = ROOM_BOUNDS[roomIndex] || ROOM_BOUNDS[1];
+  const points = [];
+  const minDistance = 2.0;
+
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    let pos = null;
+
+    while (attempts < 25) {
+      attempts++;
+      let x, z;
+
+      if (pattern === 'ambush') {
+        const side = prng.random() > 0.5 ? 1 : -1;
+        x = side * (bounds.xMax - 1 - prng.random() * 2.5);
+        z = bounds.zMin + 2 + prng.random() * (bounds.zMax - bounds.zMin - 4);
+      } else if (pattern === 'ring') {
+        const angle = (i / count) * Math.PI * 2 + (prng.random() - 0.5) * 0.4;
+        const radius = 5.0 + prng.random() * 3.5;
+        const centerX = 0;
+        const centerZ = bounds.centerZ;
+        x = Math.max(bounds.xMin + 1, Math.min(bounds.xMax - 1, centerX + Math.cos(angle) * radius));
+        z = Math.max(bounds.zMin + 1, Math.min(bounds.zMax - 1, centerZ + Math.sin(angle) * radius));
+      } else if (pattern === 'center_guard') {
+        x = (prng.random() - 0.5) * 6;
+        z = bounds.centerZ + (prng.random() - 0.5) * 6;
+      } else {
+        x = bounds.xMin + 2 + prng.random() * (bounds.xMax - bounds.zMin > 0 ? bounds.xMax - bounds.xMin - 4 : 8);
+        z = bounds.zMin + 3 + prng.random() * (bounds.zMax - bounds.zMin - 6);
+      }
+
+      const tooClose = points.some((p) => {
+        const dx = p[0] - x;
+        const dz = p[2] - z;
+        return Math.sqrt(dx * dx + dz * dz) < minDistance;
+      });
+
+      if (!tooClose || attempts > 18) {
+        pos = [+(x.toFixed(2)), bounds.floorY, +(z.toFixed(2))];
+        break;
+      }
+    }
+
+    if (pos) points.push(pos);
+  }
+
+  return points;
+}
+
+/**
+ * Procedurally generates encounters for the entire dungeon with seed determinism.
+ */
+export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1, seed = 133789) {
+  const prng = createPrng(seed);
   const rankConfig = DUNGEON_RANKS[dungeonRank] || DUNGEON_RANKS.E;
   const rankMult = rankConfig.multiplier;
   const baseLevel = Math.max(playerLevel, rankConfig.baseLevel);
@@ -122,18 +119,17 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
   const encounters = {};
 
   // -------------------------------------------------------------
-  // ROOM 1 ENCOUNTER (Z: 7 to -26)
-  // Options: SWARM (20-25 weak) | SQUAD (5-8 medium) | AMBUSH (12 mixed) | MIXED (8 weak + 2 medium)
+  // ROOM 1: THE FORGOTTEN CRYPT (Z: 7 to -26)
+  // Options: SQUAD | SWARM | MIXED
   // -------------------------------------------------------------
-  const room1Types = [
-    { type: ENCOUNTER_TYPES.SQUAD, weight: 35 },
-    { type: ENCOUNTER_TYPES.SWARM, weight: 30 },
-    { type: ENCOUNTER_TYPES.MIXED, weight: 25 },
-    { type: ENCOUNTER_TYPES.AMBUSH, weight: 10 }
+  const r1Types = [
+    { type: ENCOUNTER_TYPES.SQUAD, weight: 40 },
+    { type: ENCOUNTER_TYPES.SWARM, weight: 35 },
+    { type: ENCOUNTER_TYPES.MIXED, weight: 25 }
   ];
-  const r1Choice = weightedRandom(room1Types);
+  const r1Choice = weightedRandom(prng, r1Types);
 
-  encounters[1] = buildRoomEncounter(1, r1Choice, baseLevel, rankMult, {
+  encounters[1] = buildDeterministicRoomEncounter(prng, 1, r1Choice, baseLevel, rankMult, {
     weakTypes: ['ashGoblin', 'rottingSkeleton', 'caveCrawler', 'shadowRat'],
     mediumTypes: ['graveSoldier', 'boneReaver'],
     eliteTypes: ['cryptGuardian'],
@@ -141,18 +137,17 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
   });
 
   // -------------------------------------------------------------
-  // ROOM 2 ENCOUNTER (Z: -41 to -72)
-  // Options: SOLO_ELITE (1 massive apex) | COMMANDER (1 warlord + minions) | MIXED (elite + squad) | SWARM (25-30)
+  // ROOM 2: ELITE SANCTUM (Z: -41 to -72)
+  // Options: SOLO_ELITE (Blood Knight / Crypt Guardian) | COMMANDER | MIXED
   // -------------------------------------------------------------
-  const room2Types = [
-    { type: ENCOUNTER_TYPES.SOLO_ELITE, weight: 35 },
+  const r2Types = [
+    { type: ENCOUNTER_TYPES.SOLO_ELITE, weight: 50 },
     { type: ENCOUNTER_TYPES.COMMANDER, weight: 25 },
-    { type: ENCOUNTER_TYPES.MIXED, weight: 25 },
-    { type: ENCOUNTER_TYPES.SWARM, weight: 15 }
+    { type: ENCOUNTER_TYPES.MIXED, weight: 25 }
   ];
-  const r2Choice = weightedRandom(room2Types);
+  const r2Choice = weightedRandom(prng, r2Types);
 
-  encounters[2] = buildRoomEncounter(2, r2Choice, baseLevel + 2, rankMult, {
+  encounters[2] = buildDeterministicRoomEncounter(prng, 2, r2Choice, baseLevel + 2, rankMult, {
     weakTypes: ['ashGoblin', 'rottingSkeleton', 'caveCrawler'],
     mediumTypes: ['graveSoldier', 'boneReaver', 'cryptHunter'],
     eliteTypes: ['bloodKnight', 'cryptGuardian', 'voidExecutioner'],
@@ -161,18 +156,17 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
   });
 
   // -------------------------------------------------------------
-  // ROOM 3 ENCOUNTER (Z: -73 to -108)
-  // Options: COMMANDER (1 warlord + archers + guards) | AMBUSH (escalating waves) | MIXED (2 elites + minions) | SWARM (30 crawlers)
+  // ROOM 3: FLOODED CATACOMBS (Z: -73 to -108)
+  // Options: COMMANDER | AMBUSH | MIXED
   // -------------------------------------------------------------
-  const room3Types = [
+  const r3Types = [
     { type: ENCOUNTER_TYPES.COMMANDER, weight: 40 },
-    { type: ENCOUNTER_TYPES.AMBUSH, weight: 25 },
-    { type: ENCOUNTER_TYPES.MIXED, weight: 20 },
-    { type: ENCOUNTER_TYPES.SWARM, weight: 15 }
+    { type: ENCOUNTER_TYPES.AMBUSH, weight: 35 },
+    { type: ENCOUNTER_TYPES.MIXED, weight: 25 }
   ];
-  const r3Choice = weightedRandom(room3Types);
+  const r3Choice = weightedRandom(prng, r3Types);
 
-  encounters[3] = buildRoomEncounter(3, r3Choice, baseLevel + 4, rankMult, {
+  encounters[3] = buildDeterministicRoomEncounter(prng, 3, r3Choice, baseLevel + 4, rankMult, {
     weakTypes: ['caveCrawler', 'shadowRat', 'rottingSkeleton'],
     mediumTypes: ['voidArcher', 'graveSoldier', 'darkBeast', 'cryptHunter'],
     eliteTypes: ['bloodKnight', 'cryptReaper', 'voidExecutioner'],
@@ -181,27 +175,54 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
   });
 
   // -------------------------------------------------------------
-  // ROOM 4 ENCOUNTER: THE ABYSS WARDEN BOSS (Z: -109 to -165)
-  // Multi-phase boss with dynamic minion wave generation
+  // ROOM 4: THRONE OF THE ABYSS WARDEN (Z: -109 to -165)
+  // Boss Sovereign
   // -------------------------------------------------------------
   const bossLevel = baseLevel + 6;
   const scaledBoss = scaleEnemyStats(ENEMY_TYPES.abyssWarden, bossLevel, rankMult);
 
   encounters[4] = {
+    id: 'enc_r4_abyss_warden',
     roomIndex: 4,
     type: ENCOUNTER_TYPES.BOSS,
     typeName: 'Sovereign of the Abyss',
+    primaryEnemy: {
+      id: 'abyssWarden',
+      name: 'Abyss Warden',
+      tier: 'boss',
+      tierLabel: 'BOSS',
+      starsText: '★★★★★',
+      level: bossLevel,
+      description: 'The supreme ancient sovereign awakened within the depths of the throne room.',
+      dangerLabel: 'LETHAL',
+      dangerStars: 5,
+      hp: scaledBoss.maxHp,
+      maxHp: scaledBoss.maxHp,
+      attack: scaledBoss.attack
+    },
     dangerRating: { stars: 5, label: 'LETHAL', ratingText: '★★★★★' },
-    rewardMultiplier: 3.5,
+    discoveryDistance: 25.0, // 25 meters detection range for Boss
+    encounterCenter: [0, 0, -136],
+    battleSpawnPlayer: [0, 0.5, -126], // 10 meters in front
+    battleSpawnMonster: [0, 0, -138],
+    isAmbush: false,
+    isSwarm: false,
     hasCommander: true,
     hasElite: true,
-    isAmbush: false,
     boss: scaledBoss,
+    enemies: [
+      {
+        ...scaledBoss,
+        id: 'abyssWarden',
+        spawnPosition: [0, 0, -138],
+        room: 4
+      }
+    ],
     waves: [
       {
         waveNumber: 1,
         waveName: 'Awakening Duel',
-        enemies: [] // Boss is rendered by AbyssWardenBoss
+        enemies: []
       },
       {
         waveNumber: 2,
@@ -220,272 +241,372 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1) {
         ]
       }
     ],
-    totalEnemies: 1
+    totalEnemies: 1,
+    discovered: false,
+    defeated: false,
+    clues: [
+      'Violent abyssal energy emanates through the grand portal',
+      'The ground trembles under colossal footfalls ahead',
+      'Ancient warning inscriptions carved into the stone floor'
+    ]
   };
 
   return encounters;
 }
 
 /**
- * Builds a concrete room encounter based on type and enemy pool
+ * Builds an encounter for rooms 1-3
  */
-function buildRoomEncounter(roomIndex, encounterType, level, rankMult, pools) {
+function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, rankMult, pools) {
+  const bounds = ROOM_BOUNDS[roomIndex];
+  const centerZ = bounds.centerZ;
+  const encounterCenter = [0, bounds.floorY, centerZ];
+
   let enemies = [];
   let waves = [];
   let typeName = '';
-  let rewardMultiplier = 1.0;
+  let primaryEnemy = null;
   let hasCommander = false;
   let hasElite = false;
-  let commanderId = null;
   let isAmbush = false;
+  let isSwarm = false;
+  let discoveryDistance = 12.0;
+  let clues = [];
 
-  const randFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const randFrom = (arr) => arr[Math.floor(prng.random() * arr.length)];
 
   if (encounterType === ENCOUNTER_TYPES.SWARM) {
-    // 20–35 weak enemies in 2 fast waves!
+    // SWARM: 14-22 weak enemies
+    isSwarm = true;
     typeName = 'Verminous Swarm';
-    rewardMultiplier = 1.6;
-    const wave1Count = 12 + Math.floor(Math.random() * 6);
-    const wave2Count = 14 + Math.floor(Math.random() * 8);
+    discoveryDistance = 10.0; // 10m weak detection
+    const count = 14 + Math.floor(prng.random() * 8);
 
-    const spawnPointsW1 = generateSpawnPoints(roomIndex, wave1Count, 'ring');
-    const spawnPointsW2 = generateSpawnPoints(roomIndex, wave2Count, 'ambush');
+    const spawnPoints = generateDeterministicPoints(prng, roomIndex, count, 'ring');
+    const primaryTypeKey = randFrom(pools.weakTypes);
+    const sampleEnemy = scaleEnemyStats(ENEMY_TYPES[primaryTypeKey], level, rankMult);
 
-    const w1Enemies = spawnPointsW1.map((pos, idx) => {
-      const typeKey = randFrom(pools.weakTypes);
+    enemies = spawnPoints.map((pos, idx) => {
+      const typeKey = idx % 2 === 0 ? primaryTypeKey : randFrom(pools.weakTypes);
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_w1_${idx}_${typeKey}`,
+        id: `enc_r${roomIndex}_swarm_${idx}_${typeKey}`,
         spawnPosition: pos,
         room: roomIndex
       };
     });
 
-    const w2Enemies = spawnPointsW2.map((pos, idx) => {
-      const typeKey = randFrom(pools.weakTypes);
-      const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level + 1, rankMult);
-      return {
-        ...scaled,
-        id: `r${roomIndex}_w2_${idx}_${typeKey}`,
-        spawnPosition: pos,
-        room: roomIndex
-      };
-    });
+    primaryEnemy = {
+      id: `swarm_r${roomIndex}`,
+      name: `${sampleEnemy.name} Swarm`,
+      tier: 'weak',
+      tierLabel: 'SWARM',
+      starsText: '★☆☆☆☆',
+      level,
+      description: `A horde of ${enemies.length} frenzied creatures skittering in the shadows.`,
+      dangerLabel: 'MODERATE',
+      dangerStars: 2,
+      hp: sampleEnemy.maxHp * enemies.length,
+      maxHp: sampleEnemy.maxHp * enemies.length,
+      enemyCount: enemies.length
+    };
 
-    waves = [
-      { waveNumber: 1, waveName: 'Swarm Vanguard', enemies: w1Enemies },
-      { waveNumber: 2, waveName: 'Swarm Overwhelming Wave', enemies: w2Enemies }
+    clues = [
+      'Claw scratches and scurry marks cover the damp flagstones',
+      'High-pitched chattering echoes from the gloom',
+      'Gnawed bones scattered along the corridor'
     ];
-    enemies = w1Enemies; // Initial active wave
 
   } else if (encounterType === ENCOUNTER_TYPES.SOLO_ELITE) {
-    // 1 massive monster, dramatic arena duel
-    typeName = 'Apex Predator Duel';
-    rewardMultiplier = 2.2;
+    // SOLO ELITE: Blood Knight or Crypt Guardian
     hasElite = true;
+    discoveryDistance = 15.0; // 15m elite detection
 
     const eliteKey = randFrom(pools.eliteTypes);
     const scaledElite = scaleEnemyStats(ENEMY_TYPES[eliteKey], level + 2, rankMult * 1.3);
 
-    // Center spawn
-    const bounds = ROOM_BOUNDS[roomIndex];
-    const centerZ = (bounds.zMin + bounds.zMax) / 2;
-    const elitePos = [0, bounds.floorY, centerZ];
-
     const eliteEnemy = {
       ...scaledElite,
-      id: `r${roomIndex}_elite_apex`,
-      name: `Prime ${scaledElite.name}`,
-      scale: (scaledElite.scale || 1.4) * 1.25, // Noticeably larger!
-      baseHp: scaledElite.baseHp * 1.5,
-      maxHp: Math.round(scaledElite.maxHp * 1.5),
-      hp: Math.round(scaledElite.maxHp * 1.5),
-      spawnPosition: elitePos,
+      id: `enc_r${roomIndex}_elite_${eliteKey}`,
+      name: scaledElite.name,
+      scale: (scaledElite.scale || 1.4) * 1.15,
+      maxHp: Math.round(scaledElite.maxHp * 1.4),
+      hp: Math.round(scaledElite.maxHp * 1.4),
+      attack: Math.round(scaledElite.attack * 1.2),
+      spawnPosition: [0, bounds.floorY, centerZ],
       isApex: true,
       room: roomIndex
     };
 
     enemies = [eliteEnemy];
-    waves = [{ waveNumber: 1, waveName: 'Apex Predator', enemies }];
+    typeName = `${eliteEnemy.name} Sanctum`;
+
+    primaryEnemy = {
+      id: eliteEnemy.id,
+      name: eliteEnemy.name,
+      tier: 'elite',
+      tierLabel: 'ELITE',
+      starsText: '★★★★☆',
+      level: level + 2,
+      description: `A formidable ${eliteEnemy.name} standing vigil over the chamber.`,
+      dangerLabel: 'EXTREME',
+      dangerStars: 4,
+      hp: eliteEnemy.maxHp,
+      maxHp: eliteEnemy.maxHp,
+      attack: eliteEnemy.attack
+    };
+
+    clues = [
+      'Heavy iron armored footprints indented into the floor',
+      'Deep halberd gouges slashed across the stonework',
+      'Fresh blood stains pooling near the central dais',
+      'A menacing crimson aura pulses from within'
+    ];
 
   } else if (encounterType === ENCOUNTER_TYPES.COMMANDER) {
-    // 1 commander + 10-18 weaker monsters
-    typeName = 'Warlord Battle Legion';
-    rewardMultiplier = 2.6;
+    // COMMANDER: 1 Grave Warlord + guards
     hasCommander = true;
     hasElite = true;
+    discoveryDistance = 18.0;
 
     const cmdKey = randFrom(pools.commanderTypes || ['graveWarlord']);
     const scaledCmd = scaleEnemyStats(ENEMY_TYPES[cmdKey], level + 3, rankMult);
-
-    const bounds = ROOM_BOUNDS[roomIndex];
-    const centerZ = (bounds.zMin + bounds.zMax) / 2;
-    commanderId = `r${roomIndex}_commander`;
+    const cmdId = `enc_r${roomIndex}_commander_${cmdKey}`;
 
     const commanderEnemy = {
       ...scaledCmd,
-      id: commanderId,
+      id: cmdId,
       spawnPosition: [0, bounds.floorY, centerZ - 2],
       isCommander: true,
       room: roomIndex
     };
 
-    const minionCount = 10 + Math.floor(Math.random() * 6);
-    const minionPoints = generateSpawnPoints(roomIndex, minionCount, 'center_guard');
-
+    const minionCount = 6 + Math.floor(prng.random() * 4);
+    const minionPoints = generateDeterministicPoints(prng, roomIndex, minionCount, 'center_guard');
     const minions = minionPoints.map((pos, idx) => {
-      // 70% weak, 30% normal guards
-      const isGuard = Math.random() < 0.35 && pools.mediumTypes.length > 0;
-      const typeKey = isGuard ? randFrom(pools.mediumTypes) : randFrom(pools.weakTypes);
+      const typeKey = prng.random() < 0.4 ? randFrom(pools.mediumTypes) : randFrom(pools.weakTypes);
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_minion_${idx}`,
+        id: `enc_r${roomIndex}_cmd_minion_${idx}`,
         spawnPosition: pos,
-        commanderId,
+        commanderId: cmdId,
         room: roomIndex
       };
     });
 
     enemies = [commanderEnemy, ...minions];
-    waves = [{ waveNumber: 1, waveName: 'Legion Assembly', enemies }];
+    typeName = `${commanderEnemy.name} Warband`;
+
+    primaryEnemy = {
+      id: commanderEnemy.id,
+      name: commanderEnemy.name,
+      tier: 'commander',
+      tierLabel: 'COMMANDER',
+      starsText: '★★★★★',
+      level: level + 3,
+      description: `A battle-hardened ${commanderEnemy.name} commanding a retinue of undead legionnaires.`,
+      dangerLabel: 'EXTREME',
+      dangerStars: 4,
+      hp: commanderEnemy.maxHp,
+      maxHp: commanderEnemy.maxHp,
+      attack: commanderEnemy.attack,
+      enemyCount: enemies.length
+    };
+
+    clues = [
+      'Shattered shields with military crests litter the pathway',
+      'A low, rumbling war chant resonates from the hall',
+      'Torches ahead burn with an unnatural dark flame'
+    ];
 
   } else if (encounterType === ENCOUNTER_TYPES.AMBUSH) {
-    // Ambush encounter: enemies surge from multiple directions
-    typeName = 'Subterranean Ambush';
-    rewardMultiplier = 1.9;
+    // AMBUSH: Hidden enemies springing from alcoves
     isAmbush = true;
+    discoveryDistance = 12.0;
+    typeName = 'Subterranean Ambush';
 
-    const ambushCount = 12 + Math.floor(Math.random() * 6);
-    const ambushPoints = generateSpawnPoints(roomIndex, ambushCount, 'ambush');
+    const ambushCount = 8 + Math.floor(prng.random() * 4);
+    const ambushPoints = generateDeterministicPoints(prng, roomIndex, ambushCount, 'ambush');
 
     enemies = ambushPoints.map((pos, idx) => {
-      const typeKey = idx % 3 === 0 && pools.mediumTypes.length > 0
-        ? randFrom(pools.mediumTypes)
-        : randFrom(pools.weakTypes);
+      const typeKey = idx % 3 === 0 ? randFrom(pools.mediumTypes) : randFrom(pools.weakTypes);
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level + 1, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_ambush_${idx}`,
+        id: `enc_r${roomIndex}_ambush_${idx}`,
         spawnPosition: pos,
         isAmbushSpawn: true,
         room: roomIndex
       };
     });
 
-    waves = [{ waveNumber: 1, waveName: 'Ambush Strike', enemies }];
+    primaryEnemy = {
+      id: `ambush_r${roomIndex}`,
+      name: 'Crypt Stalker Ambush',
+      tier: 'normal',
+      tierLabel: 'AMBUSH',
+      starsText: '★★★☆☆',
+      level: level + 1,
+      description: 'Hostile presences lurking in dark crevices, waiting to encircle prey.',
+      dangerLabel: 'HIGH',
+      dangerStars: 3,
+      hp: enemies.reduce((sum, e) => sum + e.maxHp, 0),
+      maxHp: enemies.reduce((sum, e) => sum + e.maxHp, 0),
+      enemyCount: enemies.length
+    };
+
+    clues = [
+      'Ominous silence clings to the chamber walls',
+      'Disturbed cobwebs and fresh ceiling debris',
+      'A faint shadow flits between the upper alcoves'
+    ];
 
   } else if (encounterType === ENCOUNTER_TYPES.MIXED) {
-    // 8-12 weak + 3 medium + 1 elite
-    typeName = 'Vanguard Phalanx';
-    rewardMultiplier = 2.0;
+    // MIXED: 1 elite + guards + minions
     hasElite = true;
+    discoveryDistance = 14.0;
+    typeName = 'Vanguard Phalanx';
 
     const eliteKey = randFrom(pools.eliteTypes);
     const scaledElite = scaleEnemyStats(ENEMY_TYPES[eliteKey], level + 2, rankMult);
-    const bounds = ROOM_BOUNDS[roomIndex];
-    const centerZ = (bounds.zMin + bounds.zMax) / 2;
-
     const eliteEnemy = {
       ...scaledElite,
-      id: `r${roomIndex}_phalanx_elite`,
+      id: `enc_r${roomIndex}_phalanx_elite`,
       spawnPosition: [0, bounds.floorY, centerZ],
       room: roomIndex
     };
 
-    const guardCount = 3 + Math.floor(Math.random() * 3);
-    const guardPoints = generateSpawnPoints(roomIndex, guardCount, 'center_guard');
+    const guardCount = 3 + Math.floor(prng.random() * 2);
+    const guardPoints = generateDeterministicPoints(prng, roomIndex, guardCount, 'center_guard');
     const guards = guardPoints.map((pos, idx) => {
       const typeKey = randFrom(pools.mediumTypes);
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level + 1, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_guard_${idx}`,
+        id: `enc_r${roomIndex}_phalanx_guard_${idx}`,
         spawnPosition: pos,
         room: roomIndex
       };
     });
 
-    const weakCount = 6 + Math.floor(Math.random() * 5);
-    const weakPoints = generateSpawnPoints(roomIndex, weakCount, 'ring');
+    const weakCount = 4 + Math.floor(prng.random() * 3);
+    const weakPoints = generateDeterministicPoints(prng, roomIndex, weakCount, 'ring');
     const weaks = weakPoints.map((pos, idx) => {
       const typeKey = randFrom(pools.weakTypes);
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_phalanx_weak_${idx}`,
+        id: `enc_r${roomIndex}_phalanx_weak_${idx}`,
         spawnPosition: pos,
         room: roomIndex
       };
     });
 
     enemies = [eliteEnemy, ...guards, ...weaks];
-    waves = [{ waveNumber: 1, waveName: 'Phalanx Vanguard', enemies }];
+
+    primaryEnemy = {
+      id: eliteEnemy.id,
+      name: `${eliteEnemy.name} Guard`,
+      tier: 'elite',
+      tierLabel: 'ELITE SQUAD',
+      starsText: '★★★★☆',
+      level: level + 2,
+      description: `An elite ${eliteEnemy.name} supported by stalwart defenders.`,
+      dangerLabel: 'HIGH',
+      dangerStars: 3,
+      hp: eliteEnemy.maxHp,
+      maxHp: eliteEnemy.maxHp,
+      enemyCount: enemies.length
+    };
+
+    clues = [
+      'Heavy barricades and broken iron gates',
+      'The scent of dark sorcery lingering in the stagnant air',
+      'Scattered weapons dropped in panicked retreat'
+    ];
 
   } else {
-    // SQUAD: 4-8 medium enemies
+    // SQUAD: 4-6 normal enemies
+    discoveryDistance = 12.0;
     typeName = 'Crypt Patrol Squad';
-    rewardMultiplier = 1.4;
 
-    const squadCount = 4 + Math.floor(Math.random() * 4);
-    const squadPoints = generateSpawnPoints(roomIndex, squadCount, 'scatter');
+    const count = 4 + Math.floor(prng.random() * 3);
+    const points = generateDeterministicPoints(prng, roomIndex, count, 'scatter');
+    const primaryKey = randFrom(pools.mediumTypes);
+    const sample = scaleEnemyStats(ENEMY_TYPES[primaryKey], level, rankMult);
 
-    enemies = squadPoints.map((pos, idx) => {
-      const typeKey = randFrom(pools.mediumTypes.concat(pools.weakTypes));
+    enemies = points.map((pos, idx) => {
+      const typeKey = idx === 0 ? primaryKey : randFrom(pools.mediumTypes.concat(pools.weakTypes));
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `r${roomIndex}_squad_${idx}`,
+        id: `enc_r${roomIndex}_squad_${idx}`,
         spawnPosition: pos,
         room: roomIndex
       };
     });
 
-    waves = [{ waveNumber: 1, waveName: 'Patrol Squad', enemies }];
+    primaryEnemy = {
+      id: `squad_r${roomIndex}`,
+      name: `${sample.name} Patrol`,
+      tier: 'normal',
+      tierLabel: 'NORMAL',
+      starsText: '★★☆☆☆',
+      level,
+      description: `A squad of ${enemies.length} hostile undead patrolling the corridor.`,
+      dangerLabel: 'MODERATE',
+      dangerStars: 2,
+      hp: enemies.reduce((sum, e) => sum + e.maxHp, 0),
+      maxHp: enemies.reduce((sum, e) => sum + e.maxHp, 0),
+      enemyCount: enemies.length
+    };
+
+    clues = [
+      'Rhythmic clanking of rusty chainmail ahead',
+      'Muffled metallic footsteps echoing between the pillars',
+      'Scratched sigils on the floor marking patrol boundaries'
+    ];
   }
 
-  // Calculate total HP and danger rating
-  let totalHp = enemies.reduce((sum, e) => sum + (e.maxHp || e.baseHp || 100), 0);
-  if (waves.length > 1) {
-    waves.slice(1).forEach(w => {
-      totalHp += w.enemies.reduce((sum, e) => sum + (e.maxHp || e.baseHp || 100), 0);
-    });
-  }
-
+  const totalHp = enemies.reduce((sum, e) => sum + (e.maxHp || 100), 0);
   const dangerRating = calculateDangerRating(totalHp, enemies.length, hasCommander, hasElite, level);
 
+  // Position player 9m in front of center for battle transition
+  const battleSpawnPlayer = [0, 0.5, centerZ + 9.5];
+  const battleSpawnMonster = [0, 0, centerZ - 1.5];
+
   return {
+    id: `enc_r${roomIndex}_${encounterType.toLowerCase()}`,
     roomIndex,
     type: encounterType,
     typeName,
+    primaryEnemy,
     dangerRating,
-    rewardMultiplier,
+    discoveryDistance,
+    encounterCenter,
+    battleSpawnPlayer,
+    battleSpawnMonster,
+    enemies,
+    totalEnemies: enemies.length,
+    waves: [{ waveNumber: 1, waveName: typeName, enemies }],
     hasCommander,
     hasElite,
-    commanderId,
     isAmbush,
-    enemies,
-    waves,
-    currentWave: 1,
-    totalWaves: waves.length,
-    totalEnemies: enemies.length + (waves.length > 1 ? waves.slice(1).reduce((acc, w) => acc + w.enemies.length, 0) : 0)
+    isSwarm,
+    discovered: false,
+    defeated: false,
+    clues
   };
 }
 
-/**
- * Weighted random selector helper
- */
-function weightedRandom(items) {
-  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-  let random = Math.random() * totalWeight;
-
+function weightedRandom(prng, items) {
+  const total = items.reduce((acc, item) => acc + item.weight, 0);
+  let threshold = prng.random() * total;
   for (const item of items) {
-    if (random < item.weight) {
-      return item.type;
-    }
-    random -= item.weight;
+    if (threshold < item.weight) return item.type;
+    threshold -= item.weight;
   }
-
   return items[0].type;
 }

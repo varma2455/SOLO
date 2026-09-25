@@ -1,11 +1,13 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { safeVector3 } from '../../utils/vector3';
 
 // Single Shadow Slash Projectile Wave
 const SlashWave = ({ effect, onComplete }) => {
   const meshRef = useRef();
-  const dir = useRef(new THREE.Vector3(Math.sin(effect.angle), 0, Math.cos(effect.angle)).normalize());
+  const dir = useRef(new THREE.Vector3(Math.sin(effect.angle || 0), 0, Math.cos(effect.angle || 0)).normalize());
+  const pos = safeVector3(effect.position, [0, 0.8, 0], 'SlashWave');
 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
@@ -22,8 +24,8 @@ const SlashWave = ({ effect, onComplete }) => {
   return (
     <mesh
       ref={meshRef}
-      position={[effect.position[0], 0.8, effect.position[2]]}
-      rotation={[-Math.PI / 2, 0, effect.angle + Math.PI / 2]}
+      position={[pos[0], 0.8, pos[2]]}
+      rotation={[-Math.PI / 2, 0, (effect.angle || 0) + Math.PI / 2]}
     >
       <ringGeometry args={[1.2, 1.8, 24, 1, 0, Math.PI]} />
       <meshBasicMaterial color="#c084fc" side={THREE.DoubleSide} transparent opacity={0.9} />
@@ -52,8 +54,9 @@ const VoidBurstShockwave = ({ effect, onComplete }) => {
     }
   });
 
+  const pos = safeVector3(effect.position, [0, 0, 0], 'VoidBurstShockwave');
   return (
-    <group position={effect.position}>
+    <group position={pos}>
       {/* Ground runic shockwave */}
       <mesh ref={ringRef} position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.5, 1.2, 32]} />
@@ -88,8 +91,9 @@ const EclipseDominionVFX = ({ effect, onComplete }) => {
     }
   });
 
+  const pos = safeVector3(effect.position, [0, 0, 0], 'EclipseDominionVFX');
   return (
-    <group position={effect.position}>
+    <group position={pos}>
       {/* Massive Dark Energy Pillar */}
       <mesh ref={pillarRef} position={[0, 6, 0]}>
         <cylinderGeometry args={[2.5, 3.5, 14, 24]} />

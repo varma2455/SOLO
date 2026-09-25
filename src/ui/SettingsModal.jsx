@@ -13,6 +13,8 @@ export const SettingsModal = () => {
   const setGraphicsQuality = useGameStore((s) => s.setGraphicsQuality);
   const autoFpsOptimization = useGameStore((s) => s.autoFpsOptimization);
   const setAutoFpsOptimization = useGameStore((s) => s.setAutoFpsOptimization);
+  const cameraSettings = useGameStore((s) => s.cameraSettings) || { sensitivity: 1.0, invertY: false, cameraShake: true };
+  const setCameraSetting = useGameStore((s) => s.setCameraSetting);
 
   const [volume, setVolumeState] = useState(sound.volume);
   const [muted, setMutedState] = useState(sound.muted);
@@ -150,6 +152,67 @@ export const SettingsModal = () => {
             </div>
           </div>
 
+          {/* Third-Person Camera Settings */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#c084fc', marginBottom: 10, letterSpacing: '1px' }}>
+              CAMERA CONFIGURATION
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 4 }}>
+              {/* Sensitivity */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: '#f3f4f6' }}>Camera Sensitivity</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>{cameraSettings.sensitivity?.toFixed(1) || '1.0'}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.4"
+                  max="2.5"
+                  step="0.1"
+                  value={cameraSettings.sensitivity || 1.0}
+                  onChange={(e) => setCameraSetting('sensitivity', parseFloat(e.target.value))}
+                  style={{ width: '100%', accentColor: '#a855f7', cursor: 'pointer' }}
+                />
+              </div>
+
+              {/* Invert Y and Camera Shake Toggles */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 4 }}>
+                  <span style={{ fontSize: 12, color: '#f3f4f6' }}>Invert Y</span>
+                  <button
+                    onClick={() => setCameraSetting('invertY', !cameraSettings.invertY)}
+                    className="btn-rpg"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      borderColor: cameraSettings.invertY ? '#38bdf8' : '#4b5563',
+                      color: cameraSettings.invertY ? '#38bdf8' : '#9ca3af'
+                    }}
+                  >
+                    {cameraSettings.invertY ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 4 }}>
+                  <span style={{ fontSize: 12, color: '#f3f4f6' }}>Camera Shake</span>
+                  <button
+                    onClick={() => setCameraSetting('cameraShake', cameraSettings.cameraShake !== false ? false : true)}
+                    className="btn-rpg"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      borderColor: cameraSettings.cameraShake !== false ? '#10b981' : '#4b5563',
+                      color: cameraSettings.cameraShake !== false ? '#34d399' : '#9ca3af'
+                    }}
+                  >
+                    {cameraSettings.cameraShake !== false ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Controls Guide */}
           <div>
@@ -168,13 +231,13 @@ export const SettingsModal = () => {
               }}
             >
               <div><strong style={{ color: '#fbbf24' }}>W / A / S / D</strong> &bull; Move Kael</div>
-              <div><strong style={{ color: '#fbbf24' }}>Mouse Move</strong> &bull; Camera Look</div>
-              <div><strong style={{ color: '#fbbf24' }}>Left Click (LMB)</strong> &bull; Basic Strike</div>
+              <div><strong style={{ color: '#fbbf24' }}>Mouse Move</strong> &bull; Free Look</div>
+              <div><strong style={{ color: '#fbbf24' }}>Left Click (LMB)</strong> &bull; 3-Hit Combo</div>
               <div><strong style={{ color: '#fbbf24' }}>Q</strong> &bull; Shadow Slash</div>
-              <div><strong style={{ color: '#fbbf24' }}>E</strong> &bull; Void Burst</div>
-              <div><strong style={{ color: '#fbbf24' }}>R</strong> &bull; Eclipse Dominion (Ult)</div>
-              <div><strong style={{ color: '#fbbf24' }}>Space</strong> &bull; Phantom Step Dash</div>
-              <div><strong style={{ color: '#fbbf24' }}>F</strong> &bull; Shadow Extraction</div>
+              <div><strong style={{ color: '#fbbf24' }}>E / Space</strong> &bull; Phantom Dash</div>
+              <div><strong style={{ color: '#fbbf24' }}>R</strong> &bull; Eclipse Strike (Ult)</div>
+              <div><strong style={{ color: '#fbbf24' }}>F</strong> &bull; Interact / Potion</div>
+              <div><strong style={{ color: '#fbbf24' }}>TAB</strong> &bull; Target Lock (Toggle)</div>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../../store/gameStore';
 import { globalPlayerState } from '../player/Player';
 import { sound } from '../../audio/soundManager';
+import { safeVector3, DEFAULT_PLAYER_POSITION } from '../../utils/vector3';
 
 const _sPPos = new THREE.Vector3();
 const _sIdleTarget = new THREE.Vector3();
@@ -19,8 +20,9 @@ const formationOffsets = [
 const SingleShadow = React.memo(({ shadow, index, playerPos, enemies, onShadowAttackEnemy }) => {
   const meshRef = useRef();
   const bladeRef = useRef();
-  const initialX = playerPos ? playerPos[0] + (index === 0 ? -2.2 : index === 1 ? 2.2 : 0) : 0;
-  const initialZ = playerPos ? playerPos[2] + 2.5 : 22.5;
+  const baseP = safeVector3(playerPos || globalPlayerState?.position, DEFAULT_PLAYER_POSITION, 'SingleShadow:initial');
+  const initialX = baseP[0] + (index === 0 ? -2.2 : index === 1 ? 2.2 : 0);
+  const initialZ = baseP[2] + 2.5;
   const pos = useRef(new THREE.Vector3(initialX, 0, initialZ));
   const rotation = useRef(0);
   const attackTimer = useRef(0);
@@ -34,8 +36,9 @@ const SingleShadow = React.memo(({ shadow, index, playerPos, enemies, onShadowAt
 
     if (globalPlayerState && (globalPlayerState.pos || globalPlayerState.posVec)) {
       _sPPos.copy(globalPlayerState.pos || globalPlayerState.posVec);
-    } else if (playerPos) {
-      _sPPos.set(playerPos[0], playerPos[1], playerPos[2]);
+    } else {
+      const curP = safeVector3(playerPos, DEFAULT_PLAYER_POSITION, 'SingleShadow:frame');
+      _sPPos.set(curP[0], curP[1], curP[2]);
     }
 
     const offset = formationOffsets[index % formationOffsets.length];
@@ -48,19 +51,23 @@ const SingleShadow = React.memo(({ shadow, index, playerPos, enemies, onShadowAt
     if (enemies && enemies.length > 0) {
       for (let i = 0; i < enemies.length; i++) {
         const en = enemies[i];
-        if (en.hp > 0 && en.position) {
-          _sEnPos.set(en.position[0], en.position[1], en.position[2]);
-          const dist = pos.current.distanceTo(_sEnPos);
-          if (dist < closestDist) {
-            closestDist = dist;
-            targetEnemy = en;
+        if (en && en.hp > 0 && en.position) {
+          const enP = safeVector3(en.position, null);
+          if (enP) {
+            _sEnPos.set(enP[0], enP[1], enP[2]);
+            const dist = pos.current.distanceTo(_sEnPos);
+            if (dist < closestDist) {
+              closestDist = dist;
+              targetEnemy = en;
+            }
           }
         }
       }
     }
 
     if (targetEnemy && targetEnemy.position) {
-      _sEnPos.set(targetEnemy.position[0], targetEnemy.position[1], targetEnemy.position[2]);
+      const enP = safeVector3(targetEnemy.position, [0, 0, 0], 'SingleShadow:targetEnemy');
+      _sEnPos.set(enP[0], enP[1], enP[2]);
       const distToEnemy = pos.current.distanceTo(_sEnPos);
 
       if (distToEnemy <= (shadow.attackRange || 2.2)) {

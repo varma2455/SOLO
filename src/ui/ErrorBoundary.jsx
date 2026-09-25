@@ -58,46 +58,50 @@ export class ErrorBoundary extends React.Component {
               boxShadow: '0 0 35px rgba(239, 68, 68, 0.4)'
             }}
           >
-            <div style={{ fontSize: 13, letterSpacing: '4px', color: '#f87171', fontWeight: 800, marginBottom: 8 }}>
-              RECOVERY SYSTEM
+            <div style={{ fontSize: 13, letterSpacing: '4px', color: '#a855f7', fontWeight: 800, marginBottom: 8 }}>
+              RECOVERY MODE
             </div>
             <h2
               style={{
                 fontFamily: 'var(--font-cinzel)',
                 fontWeight: 900,
-                fontSize: 32,
-                color: '#ef4444',
+                fontSize: 28,
+                color: '#c084fc',
                 margin: '0 0 14px 0'
               }}
             >
-              GAME ERROR
+              SAFE RECOVERY
             </h2>
-            <p style={{ fontSize: 15, color: '#e5e7eb', marginBottom: 12 }}>
-              The 3D scene failed to load.
+            <p style={{ fontSize: 15, color: '#e5e7eb', marginBottom: 12, lineHeight: 1.6 }}>
+              The previous save state or scene asset could not be completely rendered.
+              <br />
+              We have safely restored your last valid checkpoint.
             </p>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#fca5a5',
-                background: 'rgba(0, 0, 0, 0.6)',
-                padding: '10px 14px',
-                borderRadius: 4,
-                marginBottom: 24,
-                fontFamily: 'monospace',
-                wordBreak: 'break-word',
-                maxHeight: 120,
-                overflowY: 'auto'
-              }}
-            >
-              {this.state.error?.message || 'WebGL Context Creation Failure or Shader Error'}
-            </div>
+            {process.env.NODE_ENV !== 'production' && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  padding: '8px 12px',
+                  borderRadius: 4,
+                  marginBottom: 20,
+                  fontFamily: 'monospace',
+                  wordBreak: 'break-word',
+                  maxHeight: 90,
+                  overflowY: 'auto'
+                }}
+              >
+                {this.state.error?.message || 'Handled runtime state recovery'}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center' }}>
               <button
                 onClick={this.handleRetry}
                 className="btn-rpg"
                 style={{ padding: '12px 24px', fontSize: 14 }}
               >
-                [ RETRY ]
+                [ CONTINUE ]
               </button>
               <button
                 onClick={this.handleReturnToMenu}

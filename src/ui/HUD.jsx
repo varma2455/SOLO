@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { SKILLS } from '../data/skills';
-import { Sword, Zap, Wind, Flame, Shield, User, Backpack, Users, Settings, Crosshair } from 'lucide-react';
+import { Sword, Zap, Wind, Flame, Shield, User, Backpack, Users, Settings, Crosshair, Heart } from 'lucide-react';
 import { sound } from '../audio/soundManager';
 import { liveDebugMetrics } from '../game/GameCanvas';
+import { livePlayerMetrics } from '../game/player/Player';
+import { getAllLivingEnemies } from '../game/combat/EnemyPositionTracker';
+import { safeVector3, DEFAULT_PLAYER_POSITION } from '../utils/vector3';
+import { inputManager } from '../game/player/InputManager';
 
 export const HUD = () => {
   const player = useGameStore((s) => s.player);
@@ -16,12 +20,53 @@ export const HUD = () => {
   const executableEnemyId = useGameStore((s) => s.executableEnemyId);
   const shadows = useGameStore((s) => s.shadows);
   const graphicsQuality = useGameStore((s) => s.graphicsQuality || 'high');
+  const gameFlowState = useGameStore((s) => s.gameFlowState);
+  const activeEncounter = useGameStore((s) => s.activeEncounter);
+  const lockedTargetId = useGameStore((s) => s.lockedTargetId);
 
   // Time ticker for cooldown display
   const [, setTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 100);
     return () => clearInterval(timer);
+  }, []);
+
+  // Real-time input & movement controller panel state
+  const [controllerState, setControllerState] = useState({
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    pos: [0, 1, 8],
+    vel: [0, 0, 0],
+    speed: 0,
+    collapsed: false
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const keys = inputManager ? inputManager.keys : livePlayerMetrics.keys;
+      setControllerState((prev) => ({
+        ...prev,
+        w: Boolean(keys.forward || livePlayerMetrics.keys.w),
+        a: Boolean(keys.left || livePlayerMetrics.keys.a),
+        s: Boolean(keys.backward || livePlayerMetrics.keys.s),
+        d: Boolean(keys.right || livePlayerMetrics.keys.d),
+        pos: [
+          Number(livePlayerMetrics.pos[0].toFixed(1)),
+          Number(livePlayerMetrics.pos[1].toFixed(1)),
+          Number(livePlayerMetrics.pos[2].toFixed(1))
+        ],
+        vel: [
+          Number(livePlayerMetrics.vel[0].toFixed(2)),
+          Number(livePlayerMetrics.vel[1].toFixed(2)),
+          Number(livePlayerMetrics.vel[2].toFixed(2))
+        ],
+        speed: Number(livePlayerMetrics.speed.toFixed(1))
+      }));
+    }, 60);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Debug Engine Telemetry Monitor (?debug=true)
@@ -31,7 +76,16 @@ export const HUD = () => {
     drawCalls: 0,
     triangles: 0,
     textures: 0,
-    memMB: null
+    memMB: null,
+    playerPos: [0, 1, 8],
+    playerVel: [0, 0, 0],
+    playerSpeed: 0,
+    camPos: [0, 3.2, 14.5],
+    keys: { w: false, a: false, s: false, d: false, lmb: false, space: false },
+    isMoving: false,
+    isDashing: false,
+    target: null,
+    livingCount: 0
   });
   const isDebug = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
@@ -67,13 +121,26 @@ export const HUD = () => {
         }
 
         const metrics = (typeof window !== 'undefined' && window.__debugMetrics) || liveDebugMetrics;
+        const living = getAllLivingEnemies();
+        const curTarget = useGameStore.getState().lockedTargetId;
+        const targetEntry = curTarget ? living.find((e) => e.id === curTarget) : null;
+
         setDebugStats({
           fps: currentFps,
           frameTime: metrics.frameTime || 16.6,
           drawCalls: metrics.drawCalls || 0,
           triangles: metrics.triangles || 0,
           textures: metrics.textures || 0,
-          memMB: mem
+          memMB: mem,
+          playerPos: [...livePlayerMetrics.pos],
+          playerVel: [...livePlayerMetrics.vel],
+          playerSpeed: livePlayerMetrics.speed,
+          camPos: [...livePlayerMetrics.camPos],
+          keys: { ...livePlayerMetrics.keys },
+          isMoving: livePlayerMetrics.isMoving,
+          isDashing: livePlayerMetrics.isDashing,
+          target: targetEntry ? `${targetEntry.name || targetEntry.id} (HP: ${Math.round(targetEntry.hp)})` : (curTarget || null),
+          livingCount: living.length
         });
       }
 
@@ -132,26 +199,39 @@ export const HUD = () => {
             bottom: 12,
             left: 12,
             padding: '10px 14px',
-            background: 'rgba(5, 5, 12, 0.88)',
-            border: '1px solid rgba(16, 185, 129, 0.6)',
+            background: 'rgba(5, 5, 12, 0.92)',
+            border: '1px solid rgba(16, 185, 129, 0.65)',
             borderRadius: '6px',
             color: '#34d399',
             fontFamily: 'monospace',
-            fontSize: 12,
+            fontSize: 11.5,
             lineHeight: 1.5,
             zIndex: 99,
             pointerEvents: 'none',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.7)'
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.85)',
+            minWidth: 260
           }}
         >
           <div style={{ fontWeight: 800, color: '#6ee7b7', borderBottom: '1px solid rgba(16,185,129,0.3)', paddingBottom: 3, marginBottom: 5, letterSpacing: '0.5px' }}>
             ENGINE TELEMETRY (?debug=true)
           </div>
           <div>FPS: <span style={{ color: debugStats.fps >= 55 ? '#34d399' : debugStats.fps >= 30 ? '#fbbf24' : '#f87171', fontWeight: 800 }}>{debugStats.fps}</span> <span style={{ color: '#9ca3af' }}>({debugStats.frameTime} ms)</span></div>
-          <div>Draw Calls: <span style={{ color: '#f3f4f6' }}>{debugStats.drawCalls}</span></div>
-          <div>Triangles: <span style={{ color: '#f3f4f6' }}>{debugStats.triangles.toLocaleString()}</span></div>
-          <div>Textures: <span style={{ color: '#f3f4f6' }}>{debugStats.textures}</span></div>
-          {debugStats.memMB && <div>JS Memory: <span style={{ color: '#f3f4f6' }}>{debugStats.memMB} MB</span></div>}
+          <div>Pos: <span style={{ color: '#f3f4f6' }}>[{debugStats.playerPos.map((n) => Number(n).toFixed(1)).join(', ')}]</span></div>
+          <div>Vel: <span style={{ color: '#60a5fa' }}>[{debugStats.playerVel.map((n) => Number(n).toFixed(2)).join(', ')}]</span> <span style={{ color: '#9ca3af' }}>({debugStats.playerSpeed.toFixed(1)} m/s)</span></div>
+          <div>Cam: <span style={{ color: '#f3f4f6' }}>[{debugStats.camPos.map((n) => Number(n).toFixed(1)).join(', ')}]</span></div>
+          <div>
+            Input: <span style={{ color: debugStats.keys.w ? '#34d399' : '#6b7280', fontWeight: 700 }}>W</span>{' '}
+            <span style={{ color: debugStats.keys.a ? '#34d399' : '#6b7280', fontWeight: 700 }}>A</span>{' '}
+            <span style={{ color: debugStats.keys.s ? '#34d399' : '#6b7280', fontWeight: 700 }}>S</span>{' '}
+            <span style={{ color: debugStats.keys.d ? '#34d399' : '#6b7280', fontWeight: 700 }}>D</span> |{' '}
+            <span style={{ color: debugStats.keys.lmb ? '#f59e0b' : '#6b7280', fontWeight: 700 }}>LMB</span>{' '}
+            <span style={{ color: debugStats.isDashing ? '#a855f7' : '#6b7280', fontWeight: 700 }}>DASH</span>
+          </div>
+          <div>Target: <span style={{ color: debugStats.target ? '#f59e0b' : '#9ca3af', fontWeight: 700 }}>{debugStats.target || 'NONE'}</span></div>
+          <div>Enemies: <span style={{ color: '#38bdf8', fontWeight: 700 }}>{debugStats.livingCount} Active Living</span></div>
+          <div>Flow: <span style={{ color: '#38bdf8', fontWeight: 700 }}>{gameFlowState}</span> (Room {dungeon.currentRoom})</div>
+          <div>Draw Calls: <span style={{ color: '#f3f4f6' }}>{debugStats.drawCalls}</span> | Tris: <span style={{ color: '#f3f4f6' }}>{debugStats.triangles.toLocaleString()}</span></div>
+          <div>Textures: <span style={{ color: '#f3f4f6' }}>{debugStats.textures}</span> {debugStats.memMB && <span>| Mem: {debugStats.memMB}MB</span>}</div>
           <div>Preset: <span style={{ color: '#c084fc', textTransform: 'uppercase', fontWeight: 700 }}>{graphicsQuality}</span></div>
         </div>
       )}
@@ -355,6 +435,220 @@ export const HUD = () => {
         )}
       </div>
 
+      {/* --- TOP-LEFT: INTERACTIVE CONTROLLER STATUS & MANUAL TEST PANEL --- */}
+      <div
+        className="glass-panel"
+        style={{
+          position: 'absolute',
+          top: 240,
+          left: 20,
+          padding: '12px 14px',
+          width: 280,
+          pointerEvents: 'auto',
+          borderLeft: '3px solid #38bdf8',
+          background: 'rgba(10, 12, 22, 0.94)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.85)',
+          zIndex: 35
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, borderBottom: '1px solid rgba(56, 189, 248, 0.25)', paddingBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
+            CONTROLLER STATUS & TEST
+          </div>
+          <button
+            onClick={() => setControllerState((s) => ({ ...s, collapsed: !s.collapsed }))}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontWeight: 800
+            }}
+          >
+            {controllerState.collapsed ? '[ + ]' : '[ - ]'}
+          </button>
+        </div>
+
+        {!controllerState.collapsed && (
+          <div>
+            {/* WASD Real-Time Physical Key Indicators */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  fontFamily: 'monospace',
+                  background: controllerState.w ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
+                  color: controllerState.w ? '#022c22' : '#94a3b8',
+                  border: `1px solid ${controllerState.w ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
+                  boxShadow: controllerState.w ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
+                  transition: 'all 0.08s ease-out'
+                }}
+              >
+                W
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {['A', 'S', 'D'].map((key) => {
+                  const active =
+                    key === 'A' ? controllerState.a :
+                    key === 'S' ? controllerState.s : controllerState.d;
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        width: 38,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        fontFamily: 'monospace',
+                        background: active ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
+                        color: active ? '#022c22' : '#94a3b8',
+                        border: `1px solid ${active ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
+                        boxShadow: active ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
+                        transition: 'all 0.08s ease-out'
+                      }}
+                    >
+                      {key}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Coordinates & Velocity */}
+            <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 8, lineHeight: 1.45, background: 'rgba(0,0,0,0.4)', padding: '5px 8px', borderRadius: 4 }}>
+              <div>Pos: <span style={{ color: '#f8fafc', fontWeight: 700 }}>[{controllerState.pos.join(', ')}]</span></div>
+              <div>Vel: <span style={{ color: '#38bdf8', fontWeight: 700 }}>[{controllerState.vel.join(', ')}]</span> ({controllerState.speed} m/s)</div>
+            </div>
+
+            {/* Manual Movement Test Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <button
+                className="btn-rpg"
+                onMouseDown={() => inputManager?.setKey('forward', true)}
+                onMouseUp={() => inputManager?.setKey('forward', false)}
+                onClick={() => window.__moveForward?.(450)}
+                style={{ padding: '5px 8px', fontSize: 11, width: '100%', fontWeight: 700, borderColor: '#38bdf8', cursor: 'pointer' }}
+              >
+                [ ▲ MOVE FORWARD ]
+              </button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  className="btn-rpg"
+                  onMouseDown={() => inputManager?.setKey('left', true)}
+                  onMouseUp={() => inputManager?.setKey('left', false)}
+                  onClick={() => window.__moveLeft?.(450)}
+                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  [ ◄ LEFT ]
+                </button>
+                <button
+                  className="btn-rpg"
+                  onMouseDown={() => inputManager?.setKey('backward', true)}
+                  onMouseUp={() => inputManager?.setKey('backward', false)}
+                  onClick={() => window.__moveBackward?.(450)}
+                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  [ ▼ BACK ]
+                </button>
+                <button
+                  className="btn-rpg"
+                  onMouseDown={() => inputManager?.setKey('right', true)}
+                  onMouseUp={() => inputManager?.setKey('right', false)}
+                  onClick={() => window.__moveRight?.(450)}
+                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  [ ► RIGHT ]
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+                <button
+                  className="btn-rpg"
+                  onClick={() => window.__resetPlayer?.()}
+                  style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#f59e0b', color: '#fbbf24', cursor: 'pointer' }}
+                >
+                  [ ↺ RESET PLAYER ]
+                </button>
+                <button
+                  className="btn-rpg"
+                  onClick={() => window.__resetCamera?.()}
+                  style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#c084fc', color: '#e879f9', cursor: 'pointer' }}
+                >
+                  [ 🎥 RESET CAM ]
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --- TOP-CENTER: EXPLORATION STATUS BANNER --- */}
+      {gameFlowState === 'EXPLORING' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '6px 18px',
+            background: 'rgba(10, 10, 20, 0.75)',
+            border: '1px solid rgba(168, 85, 247, 0.35)',
+            boxShadow: '0 0 15px rgba(0, 0, 0, 0.6)',
+            borderRadius: 20,
+            color: '#c084fc',
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: '2px',
+            pointerEvents: 'none'
+          }}
+        >
+          ✦ EXPLORING {dungeon.name.toUpperCase()} (ROOM {dungeon.currentRoom})
+        </div>
+      )}
+
+      {/* --- TOP-CENTER: ENCOUNTER COMBAT HP BAR (WHEN IN BATTLE & NON-BOSS) --- */}
+      {gameFlowState === 'BATTLE' && activeEncounter && !dungeon.bossActive && (
+        <div
+          className="glass-panel"
+          style={{
+            position: 'absolute',
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '10px 24px',
+            minWidth: 380,
+            border: activeEncounter.hasElite ? '1px solid #ef4444' : '1px solid rgba(168, 85, 247, 0.5)',
+            boxShadow: activeEncounter.hasElite ? '0 0 20px rgba(239, 68, 68, 0.4)' : '0 0 15px rgba(147, 51, 234, 0.3)',
+            textAlign: 'center',
+            pointerEvents: 'auto'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontFamily: 'var(--font-cinzel)', fontWeight: 900, fontSize: 16, color: '#f3f4f6', letterSpacing: '1px' }}>
+              {activeEncounter.primaryEnemy?.name || activeEncounter.typeName}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: activeEncounter.hasElite ? '#ef4444' : '#fbbf24' }}>
+              {activeEncounter.primaryEnemy?.starsText || '★★★'} {activeEncounter.primaryEnemy?.tierLabel || 'COMBAT'}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>
+            {dungeon.roomEnemiesRemaining} hostile{dungeon.roomEnemiesRemaining > 1 ? 's' : ''} remaining
+          </div>
+        </div>
+      )}
+
       {/* --- TOP-CENTER: BOSS HP BAR (WHEN ACTIVE) --- */}
       {dungeon.bossActive && dungeon.bossHp > 0 && (
         <div
@@ -532,11 +826,40 @@ export const HUD = () => {
         </div>
       )}
 
+      {/* --- TOP-CENTER: TARGET LOCK NOTIFICATION --- */}
+      {lockedTargetId && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 76,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '5px 16px',
+            background: 'rgba(15, 23, 42, 0.9)',
+            border: '1px solid #38bdf8',
+            borderRadius: 20,
+            fontSize: 12,
+            color: '#38bdf8',
+            fontWeight: 800,
+            letterSpacing: '1.2px',
+            boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)',
+            zIndex: 35
+          }}
+        >
+          <span style={{ fontSize: 14 }}>◎</span>
+          <span>TARGET LOCKED</span>
+          <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>[TAB to cycle/unlock]</span>
+        </div>
+      )}
+
       {/* --- BOTTOM-CENTER: SKILL BAR --- */}
       <div
         style={{
           position: 'absolute',
-          bottom: 24,
+          bottom: 28,
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
@@ -544,7 +867,7 @@ export const HUD = () => {
           pointerEvents: 'auto'
         }}
       >
-        {/* LMB: Basic Attack */}
+        {/* LMB: Basic Attack (3-Hit Combo) */}
         <div
           className="glass-panel"
           style={{
@@ -560,7 +883,7 @@ export const HUD = () => {
         >
           <Sword size={22} color="#f3f4f6" />
           <div style={{ fontSize: 10, fontWeight: 700, color: '#c084fc', marginTop: 4 }}>LMB</div>
-          <div style={{ fontSize: 9, color: '#9ca3af' }}>Strike</div>
+          <div style={{ fontSize: 9, color: '#9ca3af' }}>3-Hit Combo</div>
         </div>
 
         {/* Q: Shadow Slash */}
@@ -584,7 +907,7 @@ export const HUD = () => {
             >
               <Zap size={22} color={isReady ? '#a855f7' : '#6b7280'} />
               <div style={{ fontSize: 10, fontWeight: 700, color: isReady ? '#c084fc' : '#9ca3af', marginTop: 4 }}>Q</div>
-              <div style={{ fontSize: 9, color: '#9ca3af' }}>Slash</div>
+              <div style={{ fontSize: 9, color: '#9ca3af' }}>Shadow Slash</div>
               {!isReady && (
                 <div
                   style={{
@@ -606,50 +929,7 @@ export const HUD = () => {
           );
         })()}
 
-        {/* E: Void Burst */}
-        {(() => {
-          const cd = getCooldownRemaining('voidBurst');
-          const isReady = cd <= 0;
-          return (
-            <div
-              className="glass-panel"
-              style={{
-                width: 68,
-                height: 68,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                overflow: 'hidden',
-                border: isReady ? '1px solid #8b5cf6' : '1px solid #4b5563'
-              }}
-            >
-              <Crosshair size={22} color={isReady ? '#8b5cf6' : '#6b7280'} />
-              <div style={{ fontSize: 10, fontWeight: 700, color: isReady ? '#c4b5fd' : '#9ca3af', marginTop: 4 }}>E</div>
-              <div style={{ fontSize: 9, color: '#9ca3af' }}>Void</div>
-              {!isReady && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(0, 0, 0, 0.75)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#f59e0b',
-                    fontWeight: 800,
-                    fontSize: 14
-                  }}
-                >
-                  {cd.toFixed(1)}s
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* SPACE: Phantom Step Dash */}
+        {/* E: Phantom Dash */}
         {(() => {
           const cd = getCooldownRemaining('phantomStep');
           const isReady = cd <= 0;
@@ -669,8 +949,8 @@ export const HUD = () => {
               }}
             >
               <Wind size={22} color={isReady ? '#06b6d4' : '#6b7280'} />
-              <div style={{ fontSize: 10, fontWeight: 700, color: isReady ? '#a5f3fc' : '#9ca3af', marginTop: 4 }}>SPACE</div>
-              <div style={{ fontSize: 9, color: '#9ca3af' }}>Dash</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: isReady ? '#a5f3fc' : '#9ca3af', marginTop: 4 }}>E</div>
+              <div style={{ fontSize: 9, color: '#9ca3af' }}>Phantom Dash</div>
               {!isReady && (
                 <div
                   style={{
@@ -735,28 +1015,216 @@ export const HUD = () => {
             </div>
           );
         })()}
+
+        {/* F: Context Interact / Recovery Potion */}
+        <div
+          className="glass-panel"
+          style={{
+            width: 68,
+            height: 68,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            border: player.hp < player.maxHp ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.15)',
+            background: player.hp < player.maxHp ? 'rgba(16, 185, 129, 0.12)' : undefined
+          }}
+          onClick={() => {
+            const store = useGameStore.getState();
+            if (store.executableEnemyId) store.triggerFinisher(store.executableEnemyId);
+            else if (store.extractionTarget) store.performExtraction();
+            else store.useHealthPotion();
+          }}
+        >
+          <Heart size={20} color={player.hp < player.maxHp ? '#34d399' : '#9ca3af'} />
+          <div style={{ fontSize: 10, fontWeight: 700, color: player.hp < player.maxHp ? '#34d399' : '#e2e8f0', marginTop: 4 }}>F</div>
+          <div style={{ fontSize: 9, color: '#9ca3af' }}>{player.hp < player.maxHp ? 'Heal/Use' : 'Interact'}</div>
+        </div>
       </div>
 
-      {/* --- BOTTOM-RIGHT: RADAR / MINI-MAP --- */}
+      {/* --- DESKTOP CONTROLS GUIDE STRIP --- */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 4,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '3px 14px',
+          background: 'rgba(5, 5, 10, 0.82)',
+          borderRadius: 4,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          fontSize: 11,
+          color: '#94a3b8',
+          letterSpacing: '0.4px',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 20
+        }}
+      >
+        <span><strong style={{ color: '#c084fc' }}>WASD</strong> Move</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>Mouse</strong> Look</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>LMB</strong> 3-Hit Combo</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>Q</strong> Skill</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>E</strong> Dash</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>R</strong> Ultimate</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>F</strong> Interact</span>
+        <span>&bull;</span>
+        <span><strong style={{ color: '#c084fc' }}>TAB</strong> Lock</span>
+      </div>
+
+
+      {/* --- BOTTOM-RIGHT: RADAR / MINI-MAP WITH FOG OF EXPLORATION --- */}
       <div
         className="glass-panel"
         style={{
           position: 'absolute',
           bottom: 24,
           right: 20,
-          width: 150,
-          height: 150,
+          width: 160,
+          height: 160,
           borderRadius: '50%',
           overflow: 'hidden',
           border: '2px solid rgba(168, 85, 247, 0.5)',
-          background: 'rgba(10, 10, 18, 0.85)',
+          background: 'radial-gradient(circle, #0e0d18 30%, #06050b 90%)',
+          boxShadow: '0 0 25px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(147, 51, 234, 0.15)',
           pointerEvents: 'auto'
         }}
       >
-        {/* Radar crosshairs */}
-        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(168, 85, 247, 0.2)' }} />
-        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(168, 85, 247, 0.2)' }} />
-        <div style={{ position: 'absolute', inset: 15, borderRadius: '50%', border: '1px solid rgba(168, 85, 247, 0.15)' }} />
+        {/* Radar crosshairs & distance circles */}
+        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(168, 85, 247, 0.15)' }} />
+        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(168, 85, 247, 0.15)' }} />
+        <div style={{ position: 'absolute', inset: 20, borderRadius: '50%', border: '1px dashed rgba(168, 85, 247, 0.12)' }} />
+        <div style={{ position: 'absolute', inset: 45, borderRadius: '50%', border: '1px solid rgba(168, 85, 247, 0.18)' }} />
+
+        {/* Dynamic Map Elements based on player offset */}
+        {(() => {
+          const liveP = typeof window !== 'undefined' && window.__playerPos ? window.__playerPos : player.position;
+          const [px, , pz] = safeVector3(liveP, DEFAULT_PLAYER_POSITION, 'HUD:miniMapPlayer');
+          const scale = 2.2; // pixels per world meter
+
+          // Explored Rooms / Sectors
+          const fog = dungeon.fogExplored || [1];
+          const rooms = [
+            { id: 1, label: 'R1', z: -10 },
+            { id: 2, label: 'R2', z: -56.5 },
+            { id: 3, label: 'R3', z: -90.5 },
+            { id: 4, label: 'Boss', z: -136 }
+          ];
+
+          // Safe Points
+          const shrines = [
+            { id: 's1', room: 1, x: 4.6, z: 23.5 },
+            { id: 's2', room: 2, x: 0, z: -42 },
+            { id: 's3', room: 3, x: 10.5, z: -75 }
+          ];
+
+          // Discovered Monsters
+          const encMap = dungeon.encounters || {};
+          const encState = dungeon.encountersState || {};
+          const discoveredMonsters = Object.values(encMap).filter(
+            (e) => (e.discovered || encState[e.id]?.discovered) && !encState[e.id]?.defeated && !e.defeated
+          );
+
+          return (
+            <>
+              {/* Room Zone Markers */}
+              {rooms.map((r) => {
+                const isRevealed = fog.includes(r.id);
+                const relZ = (r.z - pz) * scale;
+                const top = 80 - relZ;
+                if (top < -20 || top > 180) return null;
+
+                return (
+                  <div
+                    key={r.id}
+                    style={{
+                      position: 'absolute',
+                      top,
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                      background: isRevealed ? 'rgba(59, 130, 246, 0.2)' : 'rgba(30, 27, 75, 0.35)',
+                      border: isRevealed ? '1px solid rgba(59, 130, 246, 0.4)' : '1px dashed rgba(100, 116, 139, 0.3)',
+                      color: isRevealed ? '#93c5fd' : '#475569',
+                      fontSize: 8,
+                      fontWeight: 800,
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {isRevealed ? r.label : '?'}
+                  </div>
+                );
+              })}
+
+              {/* Safe Points (Shrines) on Minimap */}
+              {shrines.map((s) => {
+                const relX = (s.x - px) * scale;
+                const relZ = (s.z - pz) * scale;
+                const left = 80 + relX;
+                const top = 80 - relZ;
+                if (left < 5 || left > 155 || top < 5 || top > 155) return null;
+
+                return (
+                  <div
+                    key={s.id}
+                    title="Safe Point Altar"
+                    style={{
+                      position: 'absolute',
+                      left,
+                      top,
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: '#38bdf8',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: '0 0 6px #38bdf8'
+                    }}
+                  />
+                );
+              })}
+
+              {/* Discovered Monsters on Minimap (Only shown AFTER discovery!) */}
+              {discoveredMonsters.map((m) => {
+                const [mx, , mz] = safeVector3(m.encounterCenter, [0, 0, 0], 'HUD:miniMapMonster');
+                const relX = (mx - px) * scale;
+                const relZ = (mz - pz) * scale;
+                const left = 80 + relX;
+                const top = 80 - relZ;
+                if (left < 5 || left > 155 || top < 5 || top > 155) return null;
+
+                return (
+                  <div
+                    key={m.id}
+                    title={m.primaryEnemy?.name || 'Discovered Monster'}
+                    style={{
+                      position: 'absolute',
+                      left,
+                      top,
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: m.hasElite ? '#ef4444' : '#f59e0b',
+                      border: '1px solid #ffffff',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: m.hasElite ? '0 0 8px #ef4444' : '0 0 6px #f59e0b'
+                    }}
+                  />
+                );
+              })}
+            </>
+          );
+        })()}
 
         {/* Center: Player dot */}
         <div
@@ -769,22 +1237,23 @@ export const HUD = () => {
             borderRadius: '50%',
             background: '#38bdf8',
             transform: 'translate(-50%, -50%)',
-            boxShadow: '0 0 6px #38bdf8'
+            boxShadow: '0 0 8px #38bdf8',
+            border: '1px solid #ffffff'
           }}
         />
 
-        {/* Room Area Label */}
+        {/* Room Area Label & Exploration State */}
         <div
           style={{
             position: 'absolute',
-            bottom: 8,
+            bottom: 6,
             left: 0,
             right: 0,
             textAlign: 'center',
             fontSize: 9,
-            fontWeight: 700,
+            fontWeight: 800,
             color: '#c084fc',
-            letterSpacing: '1px'
+            letterSpacing: '0.5px'
           }}
         >
           {dungeon.currentRoom === 4 ? 'BOSS ARENA' : `ROOM ${dungeon.currentRoom}`}

@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getWoodMaterials, getIronMaterials } from './DungeonTextures';
+import { safeVector3 } from '../../utils/vector3';
 
 // Single Realistic Dungeon Wall Torch
 export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f59e0b', intensity = 3.0 }) => {
@@ -13,8 +14,10 @@ export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f5
   const woodTexture = useMemo(() => getWoodMaterials(), []);
   const ironTexture = useMemo(() => getIronMaterials(), []);
 
+  const safePos = useMemo(() => safeVector3(position, [0, 2, 0], 'DungeonTorch'), [position]);
+
   // Unique phase offset per torch so they don't flicker in sync
-  const phase = useMemo(() => position[0] * 3.7 + position[2] * 5.1, [position]);
+  const phase = useMemo(() => safePos[0] * 3.7 + safePos[2] * 5.1, [safePos]);
 
   // Spark / ember particle buffer (6 embers ascending)
   const emberCount = 6;
@@ -57,7 +60,7 @@ export const DungeonTorch = ({ position, rotation = [0, 0, 0], lightColor = '#f5
   });
 
   return (
-    <group position={position} rotation={rotation}>
+    <group position={safePos} rotation={rotation}>
       {/* Wall Mounting Plate */}
       <mesh position={[0, 0, 0]}>
         <boxGeometry args={[0.22, 0.35, 0.06]} />
@@ -131,11 +134,12 @@ export const DungeonDustMotes = ({ count = 100, bounds = [30, 8, 160] }) => {
   const pointsRef = useRef();
 
   const particleData = useMemo(() => {
+    const safeB = safeVector3(bounds, [30, 8, 160], 'DungeonDustMotes');
     const positions = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * bounds[0];
-      positions[i * 3 + 1] = 0.5 + Math.random() * bounds[1];
-      positions[i * 3 + 2] = -bounds[2] * Math.random() + 20;
+      positions[i * 3] = (Math.random() - 0.5) * safeB[0];
+      positions[i * 3 + 1] = 0.5 + Math.random() * safeB[1];
+      positions[i * 3 + 2] = -safeB[2] * Math.random() + 20;
     }
     return { positions };
   }, [count, bounds]);

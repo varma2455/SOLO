@@ -1,16 +1,40 @@
-import React from 'react';
+// -------------------------------------------------------------
+// SHADOW ASCENSION - MAIN MENU WITH SAVE SUMMARY & CONFIRMATION
+// -------------------------------------------------------------
+
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { sound } from '../audio/soundManager';
-import { Play, RotateCcw, User, Backpack, Users, Settings } from 'lucide-react';
+import { SaveManager } from '../utils/SaveManager';
+import { Play, RotateCcw, User, Backpack, Users, Settings, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export const MainMenu = () => {
   const startNewGame = useGameStore((s) => s.startNewGame);
   const continueGame = useGameStore((s) => s.continueGame);
   const setScreen = useGameStore((s) => s.setScreen);
-  const [selectedRank, setSelectedRank] = React.useState('E');
+  const [selectedRank, setSelectedRank] = useState('E');
+  const [showNewGameConfirm, setShowNewGameConfirm] = useState(false);
+  const [saveSummary, setSaveSummary] = useState(null);
 
-  const hasSave = Boolean(localStorage.getItem('shadow_ascension_save_v1'));
+  useEffect(() => {
+    const summary = SaveManager.getSaveSummary();
+    setSaveSummary(summary);
+  }, []);
+
+  const hasSave = Boolean(saveSummary);
   const ranks = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
+
+  const handleNewGameClick = () => {
+    if (hasSave) {
+      setShowNewGameConfirm(true);
+    } else {
+      startNewGame(selectedRank);
+    }
+  };
+
+  const confirmStartNewGame = () => {
+    setShowNewGameConfirm(false);
+    startNewGame(selectedRank);
+  };
 
   return (
     <div
@@ -51,7 +75,7 @@ export const MainMenu = () => {
       />
 
       {/* Main Title */}
-      <div style={{ textAlign: 'center', marginBottom: 40, zIndex: 10 }}>
+      <div style={{ textAlign: 'center', marginBottom: 28, zIndex: 10 }}>
         <div
           style={{
             fontSize: 14,
@@ -83,7 +107,7 @@ export const MainMenu = () => {
             fontWeight: 500
           }}
         >
-          RISE FROM WEAKNESS. COMMAND THE FALLEN.
+          EXPLORE &bull; DISCOVER &bull; PREPARE &bull; CONQUER
         </div>
       </div>
 
@@ -94,7 +118,7 @@ export const MainMenu = () => {
           flexDirection: 'column',
           gap: 12,
           width: '100%',
-          maxWidth: 320,
+          maxWidth: 340,
           zIndex: 10
         }}
       >
@@ -127,8 +151,9 @@ export const MainMenu = () => {
           </div>
         </div>
 
+        {/* NEW GAME BUTTON */}
         <button
-          onClick={() => startNewGame(selectedRank)}
+          onClick={handleNewGameClick}
           className="btn-rpg glow-box-purple"
           style={{
             display: 'flex',
@@ -140,24 +165,57 @@ export const MainMenu = () => {
             borderColor: 'var(--accent-purple)'
           }}
         >
-          <Play size={18} /> PLAY NEW GAME
+          <Play size={18} /> NEW GAME
         </button>
 
-        {hasSave && (
-          <button
-            onClick={() => continueGame()}
-            className="btn-rpg"
+        {/* CONTINUE BUTTON */}
+        <button
+          onClick={() => hasSave && continueGame()}
+          disabled={!hasSave}
+          className="btn-rpg"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            fontSize: 16,
+            padding: '14px 28px',
+            opacity: hasSave ? 1.0 : 0.45,
+            cursor: hasSave ? 'pointer' : 'not-allowed',
+            borderColor: hasSave ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'
+          }}
+        >
+          <RotateCcw size={18} /> CONTINUE
+        </button>
+
+        {/* LAST SAVE CARD SUMMARY */}
+        {hasSave && saveSummary && (
+          <div
             style={{
+              padding: '10px 14px',
+              background: 'rgba(15, 23, 42, 0.75)',
+              borderRadius: 6,
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              textAlign: 'left',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-              fontSize: 16,
-              padding: '14px 28px'
+              gap: 10
             }}
           >
-            <RotateCcw size={18} /> CONTINUE
-          </button>
+            <ShieldCheck size={20} color="#38bdf8" />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#38bdf8', fontWeight: 800, letterSpacing: '1px' }}>
+                <span>LAST SAVE</span>
+                <span>{saveSummary.timeAgo}</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc', marginTop: 2 }}>
+                Level {saveSummary.level} &bull; {saveSummary.dungeonName}
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                Room {saveSummary.currentRoom} &bull; HP {saveSummary.hp} / {saveSummary.maxHp}
+              </div>
+            </div>
+          </div>
         )}
 
         <button
@@ -216,6 +274,86 @@ export const MainMenu = () => {
           <Settings size={16} /> SETTINGS
         </button>
       </div>
+
+      {/* NEW GAME CONFIRMATION MODAL */}
+      {showNewGameConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(5, 5, 12, 0.85)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 90,
+            padding: 20
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: 440,
+              padding: '28px 32px',
+              border: '2px solid rgba(245, 158, 11, 0.6)',
+              boxShadow: '0 0 35px rgba(245, 158, 11, 0.3)',
+              borderRadius: 8,
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <AlertTriangle size={36} color="#fbbf24" />
+            </div>
+
+            <h2
+              style={{
+                fontFamily: 'var(--font-cinzel)',
+                fontSize: 22,
+                fontWeight: 900,
+                color: '#f8fafc',
+                margin: '0 0 10px 0',
+                letterSpacing: '1px'
+              }}
+            >
+              START NEW ADVENTURE?
+            </h2>
+
+            <p style={{ color: '#cbd5e1', fontSize: 14, margin: '0 0 24px 0', lineHeight: 1.6 }}>
+              Your current save will be preserved unless you choose to overwrite it.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={confirmStartNewGame}
+                className="btn-rpg glow-box-purple"
+                style={{
+                  flex: 1,
+                  padding: '12px 18px',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #7e22ce, #a855f7)',
+                  borderColor: '#c084fc'
+                }}
+              >
+                START
+              </button>
+
+              <button
+                onClick={() => setShowNewGameConfirm(false)}
+                className="btn-rpg btn-rpg-secondary"
+                style={{
+                  flex: 1,
+                  padding: '12px 18px',
+                  fontSize: 14
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer Info */}
       <div

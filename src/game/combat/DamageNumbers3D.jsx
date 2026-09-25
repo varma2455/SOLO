@@ -1,13 +1,15 @@
 import React from 'react';
 import { Html } from '@react-three/drei';
 import { useGameStore } from '../../store/gameStore';
+import { safeVector3 } from '../../utils/vector3';
 
 const SingleDamageNumber = React.memo(({ item }) => {
   const isCrit = item.isCrit;
+  const pos = safeVector3(item.position, [0, 1.5, 0], 'DamageNumbers3D');
 
   return (
     <Html
-      position={[item.position[0], item.position[1] + 1.2, item.position[2]]}
+      position={[pos[0], pos[1] + 1.2, pos[2]]}
       center
       style={{
         pointerEvents: 'none'

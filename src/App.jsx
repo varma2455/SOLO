@@ -10,6 +10,12 @@ import { SettingsModal } from './ui/SettingsModal';
 import { GameOverScreen } from './ui/GameOverScreen';
 import { NotificationToast } from './ui/NotificationToast';
 import { ExtractionModal } from './ui/ExtractionModal';
+import { MonsterDiscoveryModal } from './ui/MonsterDiscoveryModal';
+import { SavePrepareModal } from './ui/SavePrepareModal';
+import { BattleCountdown } from './ui/BattleCountdown';
+import { VictoryModal } from './ui/VictoryModal';
+import { SafePointModal } from './ui/SafePointModal';
+import { SaveIndicator } from './ui/SaveIndicator';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 
 export const App = () => {
@@ -57,6 +63,16 @@ export const App = () => {
 
         {/* In-Game HUD (active during game mode) */}
         {currentScreen === 'game' && <HUD />}
+
+        {/* Non-intrusive Save Indicator */}
+        <SaveIndicator />
+
+        {/* Explore-First Decision & Transition Modals */}
+        <MonsterDiscoveryModal />
+        <SavePrepareModal />
+        <BattleCountdown />
+        <VictoryModal />
+        <SafePointModal />
 
         {/* Screen Modals & Menus */}
         {currentScreen === 'menu' && <MainMenu />}
