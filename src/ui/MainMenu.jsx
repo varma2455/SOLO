@@ -5,9 +5,12 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { SaveManager } from '../utils/SaveManager';
-import { Play, RotateCcw, User, Backpack, Users, Settings, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, RotateCcw, User, Backpack, Users, Settings, AlertTriangle, ShieldCheck, Home } from 'lucide-react';
 
 export const MainMenu = () => {
+  const navigate = useNavigate();
+  const player = useGameStore((s) => s.player);
   const startNewGame = useGameStore((s) => s.startNewGame);
   const continueGame = useGameStore((s) => s.continueGame);
   const setScreen = useGameStore((s) => s.setScreen);
@@ -108,6 +111,18 @@ export const MainMenu = () => {
           }}
         >
           EXPLORE &bull; DISCOVER &bull; PREPARE &bull; CONQUER
+        </div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '0.25em',
+            color: '#38bdf8',
+            marginTop: 8,
+            textTransform: 'uppercase'
+          }}
+        >
+          HUNTER: {player?.name?.toUpperCase() || 'AWAKENED HUNTER'} &bull; LVL {player?.level || 1}
         </div>
       </div>
 
@@ -272,6 +287,22 @@ export const MainMenu = () => {
           }}
         >
           <Settings size={16} /> SETTINGS
+        </button>
+
+        <button
+          onClick={() => navigate('/')}
+          className="btn-rpg btn-rpg-secondary"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            fontSize: 15,
+            borderColor: 'rgba(56, 189, 248, 0.4)',
+            color: '#38bdf8'
+          }}
+        >
+          <Home size={16} /> RETURN TO PORTAL
         </button>
       </div>
 

@@ -35,6 +35,7 @@ import {
   createPatrolRoutine,
   updatePhysicalSteering
 } from './EnemyAI';
+import { globalShadowState } from '../shadows/ShadowCompanions';
 
 // Module-level reusable scratch vectors to eliminate garbage collection pauses
 const _scratchPPos = new THREE.Vector3();
@@ -47,6 +48,7 @@ const EnemyComponent = ({
   playerPos,
   onEnemyDeath,
   onEnemyAttackPlayer,
+  onEnemyAttackShadow,
   commanderAlive = false,
   onNearExecutable,
   isDormant = false
@@ -58,7 +60,11 @@ const EnemyComponent = ({
   const alertBillboardRef = useRef();
 
   const lockedTargetId = useGameStore((s) => s.lockedTargetId);
-  const isLockedTarget = lockedTargetId === enemyData.id;
+  const commandedTargetId = useGameStore((s) => {
+    const sh = s.shadows.find((x) => x.active && !x.isDead);
+    return sh?.commandedTargetId;
+  });
+  const isLockedTarget = lockedTargetId === enemyData.id || commandedTargetId === enemyData.id;
   const gameFlowState = useGameStore((s) => s.gameFlowState);
 
   const [currentHp, setCurrentHp] = useState(enemyData.hp || enemyData.maxHp);
@@ -172,41 +178,55 @@ const EnemyComponent = ({
     return { rootModel: res.root, nodes: res.nodes, animController: ctrl };
   }, [isGoblin, personality, variantSeed, enemyData.id, enemyData.tier, enemyData.role, enemyData.type, enemyData.name, isCommander]);
 
-  // Clean up geometry & material memory on unmount
+  // Safe cleanup on unmount: detach model references without destroying shared geometries or materials (Requirements 10 & 11)
   useEffect(() => {
     return () => {
       if (rootModel) {
-        rootModel.traverse((child) => {
-          if (child.isMesh) {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
-              else child.material.dispose();
-            }
-          }
-        });
+        // Disconnect parent references so standard garbage collection cleans up unmounted instances safely
+        if (rootModel.parent) {
+          rootModel.parent.remove(rootModel);
+        }
       }
     };
   }, [rootModel]);
 
-  // Material hit flash effect
+  // Material hit flash effect with guaranteed cleanup restoration
   useEffect(() => {
     if (!rootModel) return;
-    rootModel.traverse((child) => {
-      if (child.isMesh && child.material) {
-        const mat = child.material;
-        if (mat.emissive) {
-          if (isHit) {
-            if (!child.userData.origEmissive) {
-              child.userData.origEmissive = mat.emissive.clone();
+    const restoreMaterials = () => {
+      rootModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((mat) => {
+            if (mat && mat.emissive && child.userData.origEmissive) {
+              mat.emissive.copy(child.userData.origEmissive);
             }
-            mat.emissive.set('#ffffff');
-          } else if (child.userData.origEmissive) {
-            mat.emissive.copy(child.userData.origEmissive);
-          }
+          });
         }
-      }
-    });
+      });
+    };
+
+    if (isHit) {
+      rootModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((mat) => {
+            if (mat && mat.emissive) {
+              if (!child.userData.origEmissive) {
+                child.userData.origEmissive = mat.emissive.clone();
+              }
+              mat.emissive.set('#ef4444');
+            }
+          });
+        }
+      });
+    } else {
+      restoreMaterials();
+    }
+
+    return () => {
+      restoreMaterials();
+    };
   }, [isHit, rootModel]);
 
   const safeSpawn = safeVector3(enemyData.spawnPosition, [0, 0.5, 0], 'Enemy:spawnPosition');
@@ -457,19 +477,27 @@ const EnemyComponent = ({
       // -----------------------------------------------------------
       const attackRange = enemyData.attackRange || (personality === 'archer' ? 10.0 : 2.0);
 
+      // Check if Shadow Soldier is active and engaged
+      const hasLiveShadow = globalShadowState && globalShadowState.active && !globalShadowState.isDead;
+      const distToShadow = hasLiveShadow ? pos.current.distanceTo(globalShadowState.pos) : 999;
+      // Enemy targets Shadow if Shadow is attacking this enemy or closer to this enemy than player
+      const targetShadow = hasLiveShadow && (globalShadowState.targetId === enemyData.id || distToShadow < (distToPlayer - 0.5));
+      const combatTargetPos = targetShadow ? globalShadowState.pos : _scratchPPos;
+      const distToCombatTarget = targetShadow ? distToShadow : distToPlayer;
+
       if (personality === 'archer') {
-        // Archer behavior: Kites backward if player gets too close (< 5.5m)
-        if (distToPlayer < 5.5) {
+        // Archer behavior: Kites backward if target gets too close (< 5.5m)
+        if (distToCombatTarget < 5.5) {
           _scratchTargetPos.set(
-            pos.current.x + (pos.current.x - _scratchPPos.x) * 1.5,
+            pos.current.x + (pos.current.x - combatTargetPos.x) * 1.5,
             pos.current.y,
-            pos.current.z + (pos.current.z - _scratchPPos.z) * 1.5
+            pos.current.z + (pos.current.z - combatTargetPos.z) * 1.5
           );
           moveTarget = _scratchTargetPos;
           targetSpeed = effectiveSpeed;
-        } else if (distToPlayer <= attackRange) {
+        } else if (distToCombatTarget <= attackRange) {
           // In firing range
-          rotation.current = Math.atan2(_scratchPPos.x - pos.current.x, _scratchPPos.z - pos.current.z);
+          rotation.current = Math.atan2(combatTargetPos.x - pos.current.x, combatTargetPos.z - pos.current.z);
           if (attackTimer.current <= 0) {
             const hasToken = GroupCombatCoordinator.requestAttackToken(enemyData.room || 1, enemyData.id);
             if (hasToken) {
@@ -480,9 +508,17 @@ const EnemyComponent = ({
 
               setTimeout(() => {
                 if (aiState !== 'DEAD') {
-                  const pCur = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _scratchPPos) : _scratchPPos;
-                  if (pos.current.distanceTo(pCur) <= attackRange + 2.0) {
-                    onEnemyAttackPlayer(effectiveAttack);
+                  if (targetShadow) {
+                    if (globalShadowState.active && !globalShadowState.isDead && pos.current.distanceTo(globalShadowState.pos) <= attackRange + 2.0) {
+                      sound.playHit(false);
+                      if (onEnemyAttackShadow) onEnemyAttackShadow(effectiveAttack);
+                      else useGameStore.getState().damageShadow(effectiveAttack);
+                    }
+                  } else {
+                    const pCur = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _scratchPPos) : _scratchPPos;
+                    if (pos.current.distanceTo(pCur) <= attackRange + 2.0) {
+                      onEnemyAttackPlayer(effectiveAttack);
+                    }
                   }
                   GroupCombatCoordinator.releaseAttackToken(enemyData.room || 1, enemyData.id);
                   setAiState('CHASE');
@@ -492,25 +528,23 @@ const EnemyComponent = ({
           }
         } else {
           // Close in to attack range
-          moveTarget = _scratchPPos;
+          moveTarget = combatTargetPos;
           targetSpeed = effectiveSpeed;
         }
 
       } else {
         // Melee / Warrior / Scout / Brute / Elite Behavior
-        // Tactical surrounding: calculate assigned radial slot around player
+        // Tactical surrounding: calculate assigned radial slot around target
         const surroundRadius = personality === 'brute' ? 2.8 : 2.2;
         _scratchTargetPos.set(
-          _scratchPPos.x + Math.sin(swarmAngleOffset) * surroundRadius,
-          _scratchPPos.y,
-          _scratchPPos.z + Math.cos(swarmAngleOffset) * surroundRadius
+          combatTargetPos.x + Math.sin(swarmAngleOffset) * surroundRadius,
+          combatTargetPos.y,
+          combatTargetPos.z + Math.cos(swarmAngleOffset) * surroundRadius
         );
 
-        const distToSurround = pos.current.distanceTo(_scratchTargetPos);
-
-        if (distToPlayer <= attackRange + 0.6) {
-          // Face player directly during combat
-          rotation.current = Math.atan2(_scratchPPos.x - pos.current.x, _scratchPPos.z - pos.current.z);
+        if (distToCombatTarget <= attackRange + 0.6) {
+          // Face combat target directly during combat
+          rotation.current = Math.atan2(combatTargetPos.x - pos.current.x, combatTargetPos.z - pos.current.z);
 
           if (attackTimer.current <= 0 && aiState !== 'ATTACK') {
             const hasToken = GroupCombatCoordinator.requestAttackToken(enemyData.room || 1, enemyData.id);
@@ -526,10 +560,18 @@ const EnemyComponent = ({
               const impactDelay = personality === 'scout' ? 220 : personality === 'brute' ? 420 : 310;
               setTimeout(() => {
                 if (aiState !== 'DEAD') {
-                  const pCur = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _scratchPPos) : _scratchPPos;
-                  if (pos.current.distanceTo(pCur) <= attackRange + 1.2) {
-                    sound.playHit(false);
-                    onEnemyAttackPlayer(effectiveAttack);
+                  if (targetShadow) {
+                    if (globalShadowState.active && !globalShadowState.isDead && pos.current.distanceTo(globalShadowState.pos) <= attackRange + 1.2) {
+                      sound.playHit(false);
+                      if (onEnemyAttackShadow) onEnemyAttackShadow(effectiveAttack);
+                      else useGameStore.getState().damageShadow(effectiveAttack);
+                    }
+                  } else {
+                    const pCur = globalPlayerState ? (globalPlayerState.pos || globalPlayerState.posVec || _scratchPPos) : _scratchPPos;
+                    if (pos.current.distanceTo(pCur) <= attackRange + 1.2) {
+                      sound.playHit(false);
+                      onEnemyAttackPlayer(effectiveAttack);
+                    }
                   }
                   GroupCombatCoordinator.releaseAttackToken(enemyData.room || 1, enemyData.id);
                   setAiState('CHASE');

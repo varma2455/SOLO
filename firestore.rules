@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Verifies whether requesting user is an authorized administrator
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'pothuri2455@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Verifies whether requesting user is the document owner
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // -------------------------------------------------------------
+    // USERS COLLECTION (users/{userId})
+    // -------------------------------------------------------------
+    match /users/{userId} {
+      // Users can read own profile; Admin can read all profiles
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Normal registration: User can create their own profile, but role MUST be 'user'
+      allow create: if isOwner(userId) && request.resource.data.role == 'user';
+
+      // Updates:
+      // Admins can update anything (including roles and status)
+      // Normal users can update non-privileged fields (displayName, level, xp)
+      // Normal users CANNOT change their own role or account status
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status
+      );
+
+      // Deletion: Admin only
+      allow delete: if isAdmin();
+
+      // User subcollections (e.g. shadows subcollection)
+      match /{subcollection=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // PLAYER GAME DATA COLLECTIONS (Authoritative per UID)
+    // -------------------------------------------------------------
+    match /playerProgress/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /playerShadows/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /inventory/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /quests/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // GAME CONFIGURATION (Monsters, Shadows, Dungeons, Settings)
+    // Public/Player readable; Writable ONLY by verified administrators
+    // -------------------------------------------------------------
+    match /monsters/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /shadowDefinitions/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /dungeons/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /gameSettings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /gameConfig/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Default: Admins have access to any other collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

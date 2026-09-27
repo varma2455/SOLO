@@ -15,22 +15,23 @@ import {
 } from '../utils/SaveManager';
 import { generateSeed } from '../utils/prng';
 import { safeVector3, DEFAULT_PLAYER_POSITION } from '../utils/vector3';
+import { getAllLivingEnemies, getNearestEnemy } from '../game/combat/EnemyPositionTracker';
 
 const calculateMaxXp = (level) => {
   return Math.floor(100 * Math.pow(1.55, level - 1));
 };
 
 const initialPlayerState = {
-  name: 'Kael',
+  name: 'AWAKENED HUNTER',
   level: 1,
   xp: 0,
   maxXp: 100,
-  baseHp: 350,
-  hp: 350,
-  maxHp: 350,
-  baseMana: 150,
-  mana: 150,
-  maxMana: 150,
+  baseHp: 560,
+  hp: 560,
+  maxHp: 560,
+  baseMana: 270,
+  mana: 270,
+  maxMana: 270,
   baseAttack: 25,
   attack: 25,
   baseDefense: 12,
@@ -111,30 +112,43 @@ export const useGameStore = create((set, get) => ({
     })),
 
   // Optional Target Lock (TAB or soft auto-targeting)
+  // Target Lock & Cycle (X key or TAB)
   lockedTargetId: null,
   setLockedTargetId: (id) => set({ lockedTargetId: id }),
-  toggleTargetLock: (enemies = []) => {
-    const current = get().lockedTargetId;
-    if (current) {
+  cycleTargetLock: (enemies = []) => {
+    let list = (enemies && enemies.length > 0 ? enemies : getAllLivingEnemies()).filter(
+      (en) => en && en.hp > 0
+    );
+    if (!list || list.length === 0) {
       set({ lockedTargetId: null });
+      get().addNotification('NO TARGET', 'No hostile targets within range!', 'info');
       return;
     }
     const pPos = typeof window !== 'undefined' && window.__playerPos ? window.__playerPos : [0, 0.5, 24];
-    let nearest = null;
-    let minDist = 30;
-    (enemies || []).forEach((en) => {
-      if (en && en.hp > 0 && en.spawnPosition) {
-        const [x, , z] = safeVector3(en.spawnPosition, [0, 0, 0]);
-        const dist = Math.hypot(pPos[0] - x, pPos[2] - z);
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = en;
-        }
-      }
+    list.sort((a, b) => {
+      const posA = a.pos || safeVector3(a.position || a.spawnPosition, [0, 0, 0]);
+      const posB = b.pos || safeVector3(b.position || b.spawnPosition, [0, 0, 0]);
+      const distA = Math.hypot(pPos[0] - posA[0], pPos[2] - posA[2]);
+      const distB = Math.hypot(pPos[0] - posB[0], pPos[2] - posB[2]);
+      return distA - distB;
     });
-    if (nearest) {
-      set({ lockedTargetId: nearest.id });
+
+    const currentId = get().lockedTargetId;
+    let nextIdx = 0;
+    if (currentId) {
+      const curIdx = list.findIndex((e) => e.id === currentId);
+      if (curIdx !== -1) {
+        nextIdx = (curIdx + 1) % list.length;
+      }
     }
+    const nextEnemy = list[nextIdx];
+    set({ lockedTargetId: nextEnemy.id });
+    sound.playRuneAcquire?.();
+    const name = nextEnemy.name || nextEnemy.shadowName || nextEnemy.id;
+    get().addNotification('TARGET ACQUIRED', `TARGET: ${name.toUpperCase()}`, 'info');
+  },
+  toggleTargetLock: (enemies = []) => {
+    get().cycleTargetLock(enemies);
   },
 
   // Out of Combat Health Regeneration
@@ -182,6 +196,14 @@ export const useGameStore = create((set, get) => ({
     voidBurst: 0,
     phantomStep: 0,
     eclipseDominion: 0
+  },
+
+  // Shadow abilities cooldowns (slots 1, 2, 3, 4)
+  shadowCooldowns: {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0
   },
 
   // Active shadows (up to 3 can be summoned in 3D world)
@@ -263,12 +285,130 @@ export const useGameStore = create((set, get) => ({
   },
 
   // -------------------------------------------------------------
+  // USER PROFILE & PERSONALIZATION
+  // -------------------------------------------------------------
+  initUserData: (profile) => {
+    if (!profile) return;
+    const name = profile.displayName && profile.displayName.trim() ? profile.displayName.trim() : 'AWAKENED HUNTER';
+    const level = Math.max(1, Number(profile.level) || 1);
+    const xp = Math.max(0, Number(profile.xp) || 0);
+    const maxXp = Math.max(50, Number(profile.maxXp) || calculateMaxXp(level));
+    const hp = Math.max(100, Number(profile.hp) || 560);
+    const maxHp = Math.max(100, Number(profile.maxHp) || 560);
+    const mana = Math.max(0, Number(profile.mp || profile.mana) || 270);
+    const maxMana = Math.max(50, Number(profile.maxMp || profile.maxMana) || 270);
+    const gold = Math.max(0, Number(profile.gold) || 0);
+    const shadowCores = Math.max(0, Number(profile.shadowCores) || 3);
+    const inventory = Array.isArray(profile.inventory) && profile.inventory.length > 0
+      ? profile.inventory
+      : get().inventory;
+    const equipment = profile.equipment || get().equipment;
+    const shadows = Array.isArray(profile.shadows) ? profile.shadows : [];
+    const quests = Array.isArray(profile.quests) && profile.quests.length > 0
+      ? profile.quests
+      : get().quests;
+
+    set((state) => ({
+      player: {
+        ...state.player,
+        name,
+        level,
+        xp,
+        maxXp,
+        hp,
+        maxHp,
+        baseHp: maxHp,
+        mana,
+        maxMana,
+        baseMana: maxMana,
+        gold,
+        shadowCores,
+        attributes: profile.stats || profile.attributes || state.player.attributes
+      },
+      inventory,
+      equipment,
+      shadows,
+      quests
+    }));
+
+    get().recalculateStats();
+  },
+
+  setPlayerName: (name) => {
+    set((state) => ({
+      player: {
+        ...state.player,
+        name: name && name.trim() ? name.trim() : 'AWAKENED HUNTER'
+      }
+    }));
+  },
+
+  resetToInitialState: () => {
+    set({
+      currentScreen: 'menu',
+      gameFlowState: 'MAIN_MENU',
+      activeEncounter: null,
+      activeEncounterId: null,
+      victoryData: null,
+      safePointPrompt: null,
+      player: { ...initialPlayerState, name: 'AWAKENED HUNTER' },
+      inventory: [
+        {
+          id: 'starting_iron_blade',
+          name: 'Initiate Iron Blade',
+          category: 'weapon',
+          rarity: 'common',
+          icon: '⚔️',
+          attack: 15,
+          equipped: true,
+          description: 'Standard issue blade for awakened hunters.'
+        }
+      ],
+      equipment: {
+        weapon: {
+          id: 'starting_iron_blade',
+          name: 'Initiate Iron Blade',
+          category: 'weapon',
+          rarity: 'common',
+          icon: '⚔️',
+          attack: 15,
+          description: 'Standard issue blade for awakened hunters.'
+        },
+        armor: null,
+        accessory: null
+      },
+      shadows: [],
+      quests: [
+        {
+          id: 'quest_first_blood',
+          title: 'First Blood',
+          description: 'Defeat your first dungeon monster and survive.',
+          completed: false,
+          progress: 0,
+          required: 1,
+          rewardXp: 150,
+          rewardGold: 50
+        }
+      ],
+      executableEnemyId: null,
+      executionEvent: null,
+      spawnWaveEvent: null,
+      extractionTarget: null,
+      showExtractionModal: false,
+      damageNumbers: []
+    });
+    get().recalculateStats();
+  },
+
+  // -------------------------------------------------------------
   // START NEW GAME (Exploration First! Never spawns into combat)
   // -------------------------------------------------------------
   startNewGame: (chosenRank = 'E') => {
     sound.playClick();
+    const currentName = get().player?.name || 'AWAKENED HUNTER';
     const freshPlayer = {
       ...initialPlayerState,
+      name: currentName,
       position: [0, 1, 8] // Room 1 crypt entrance archway
     };
     const seed = generateSeed();
@@ -730,7 +870,7 @@ export const useGameStore = create((set, get) => ({
   },
 
   // -------------------------------------------------------------
-  // ROOM PROGRESSION & FOG OF EXPLORATION
+  // ATOMIC ROOM PROGRESSION & TRANSITION (Requirement 18)
   // -------------------------------------------------------------
   advanceRoom: (roomIndex) => {
     const state = get();
@@ -754,6 +894,28 @@ export const useGameStore = create((set, get) => ({
       roomIndex === 4 ? 'The air turns freezing cold. Colossal sovereign awaits.' : 'New dungeon sector discovered.',
       'info'
     );
+  },
+
+  transitionToRoom: (roomIndex, targetSpawn = null) => {
+    const state = get();
+    const safeZ = roomIndex === 1 ? 8 : roomIndex === 2 ? -50 : roomIndex === 3 ? -85 : -125;
+    const spawn = targetSpawn || [0, 1.0, safeZ];
+
+    // 1. Save current progress
+    get().saveGame();
+
+    // 2. Position player and reset camera relative to safe coordinates
+    if (typeof window !== 'undefined') {
+      if (window.__setPlayerPosition) {
+        window.__setPlayerPosition(spawn[0], spawn[1], spawn[2]);
+      }
+      if (window.__resetCamera) {
+        window.__resetCamera();
+      }
+    }
+
+    // 3. Atomically advance room
+    get().advanceRoom(roomIndex);
   },
 
   // -------------------------------------------------------------
@@ -982,16 +1144,38 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     if (state.currentScreen !== 'game') return;
     const p = state.player;
-    if (p.hp >= p.maxHp && p.mana >= p.maxMana) return;
 
     const manaRegenRate = 5.0;
     const hpRegenRate = 1.0;
     const nextMana = Math.min(p.maxMana, p.mana + manaRegenRate * elapsed);
     const nextHp = Math.min(p.maxHp, p.hp + hpRegenRate * elapsed);
 
-    set({
-      player: { ...p, mana: nextMana, hp: nextHp }
+    // Shadow MP regenerates while alive and summoned (independent from player MP)
+    const shadowMpRegenRate = 15.0;
+    let shadowUpdated = false;
+    const updatedShadows = state.shadows.map((sh) => {
+      if (sh.active && !sh.isDead) {
+        const curMp = sh.mp !== undefined ? sh.mp : 500;
+        const maxMp = sh.maxMp || 500;
+        if (curMp < maxMp) {
+          shadowUpdated = true;
+          return { ...sh, mp: Math.min(maxMp, curMp + shadowMpRegenRate * elapsed) };
+        }
+      }
+      return sh;
     });
+
+    const updateObj = {};
+    if (nextMana !== p.mana || nextHp !== p.hp) {
+      updateObj.player = { ...p, mana: nextMana, hp: nextHp };
+    }
+    if (shadowUpdated) {
+      updateObj.shadows = updatedShadows;
+    }
+
+    if (Object.keys(updateObj).length > 0) {
+      set(updateObj);
+    }
   },
 
   equipItem: (item) => {
@@ -1093,33 +1277,53 @@ export const useGameStore = create((set, get) => ({
   },
 
   performExtraction: () => {
-    const { extractionTarget, shadows } = get();
+    const { extractionTarget } = get();
     if (!extractionTarget) return;
 
-    sound.playExtraction();
+    let shadows = get().shadows;
+    if (!Array.isArray(shadows) || shadows.length === 0) {
+      shadows = DEFAULT_SHADOWS;
+    }
+
+    sound.playExtraction?.();
 
     let extractedShadow = null;
     const updatedShadows = shadows.map((sh) => {
-      if (sh.id === extractionTarget.shadowId || sh.name.toLowerCase().includes(extractionTarget.name.toLowerCase().split(' ')[0])) {
-        extractedShadow = sh;
-        return {
+      const match =
+        sh.id === extractionTarget.shadowId ||
+        sh.name.toLowerCase().includes((extractionTarget.name || '').toLowerCase().split(' ')[0]) ||
+        sh.id === 'dusk_knight';
+      if (match && !extractedShadow) {
+        extractedShadow = {
           ...sh,
           unlocked: true,
-          level: sh.level + 1,
-          hp: sh.hp + 50,
-          maxHp: sh.maxHp + 50,
-          attack: sh.attack + 8,
-          defense: sh.defense + 4
+          active: false,
+          isDead: false,
+          status: 'UNSUMMONED',
+          hp: sh.maxHp || 1000,
+          mp: sh.maxMp || 500,
+          level: (sh.level || 1) + 1
         };
+        return extractedShadow;
       }
       return sh;
     });
 
-    if (!extractedShadow && shadows.length > 0) {
-      const locked = shadows.find((s) => !s.unlocked);
-      if (locked) {
-        locked.unlocked = true;
-        extractedShadow = locked;
+    if (!extractedShadow) {
+      const firstLockedIdx = updatedShadows.findIndex((s) => !s.unlocked);
+      if (firstLockedIdx !== -1) {
+        updatedShadows[firstLockedIdx] = {
+          ...updatedShadows[firstLockedIdx],
+          unlocked: true,
+          active: false,
+          isDead: false,
+          status: 'UNSUMMONED',
+          hp: updatedShadows[firstLockedIdx].maxHp || 1000,
+          mp: updatedShadows[firstLockedIdx].maxMp || 500
+        };
+        extractedShadow = updatedShadows[firstLockedIdx];
+      } else if (updatedShadows.length > 0) {
+        extractedShadow = updatedShadows[0];
       }
     }
 
@@ -1133,8 +1337,307 @@ export const useGameStore = create((set, get) => ({
     get().updateQuestProgress('extract_shadows_2', 1);
 
     const shadowName = extractedShadow ? extractedShadow.name : 'Shadow Soldier';
-    get().addNotification('SHADOW ACQUIRED!', `${shadowName} extracted into your army!`, 'shadow');
+    get().addNotification('SHADOW ACQUIRED!', `${shadowName} extracted into your army! Press [ Z ] to summon.`, 'shadow');
     get().saveGame();
+  },
+
+  performExtractionDirect: () => {
+    let shadows = get().shadows;
+    if (!Array.isArray(shadows) || shadows.length === 0) {
+      shadows = DEFAULT_SHADOWS;
+    }
+    const targetShadow = shadows.find((s) => !s.unlocked) || shadows[0] || DEFAULT_SHADOWS[0];
+    const shadowId = targetShadow?.id || 'dusk_knight';
+    const shadowName = targetShadow?.name || 'Shadow Soldier';
+
+    const updatedShadows = (shadows.length > 0 ? shadows : DEFAULT_SHADOWS).map((sh) =>
+      sh.id === shadowId
+        ? {
+            ...sh,
+            unlocked: true,
+            active: false,
+            isDead: false,
+            status: 'UNSUMMONED',
+            hp: sh.maxHp || 1000,
+            mp: sh.maxMp || 500
+          }
+        : sh
+    );
+
+    set({
+      shadows: updatedShadows,
+      extractionTarget: null,
+      showExtractionModal: false
+    });
+
+    get().updateQuestProgress('extract_shadow', 1);
+    get().updateQuestProgress('extract_shadows_2', 1);
+    sound.playExtraction?.();
+    get().addNotification('SHADOW ACQUIRED!', `${shadowName} extracted into your army! Press [ Z ] to summon.`, 'shadow');
+    get().saveGame();
+  },
+
+  // Authoritative Context-Sensitive Z Action (Requirement 2 & 3)
+  summonOrCommandShadow: () => {
+    const state = get();
+    const shadows = state.shadows;
+    const shadow = shadows.find((s) => s.active && s.unlocked) || shadows.find((s) => s.unlocked);
+
+    if (!shadow || !shadow.unlocked) {
+      state.addNotification('NO SHADOW AVAILABLE', 'Extract a shadow from a defeated enemy first!', 'warning');
+      return;
+    }
+
+    // Context 1: Shadow is DEAD -> Z must NOT create invalid duplicate; requires resummon conditions
+    if (shadow.isDead || shadow.status === 'DEFEATED' || (shadow.hp !== undefined && shadow.hp <= 0)) {
+      const resummonMpCost = 60;
+      if (state.player.mana < resummonMpCost) {
+        state.addNotification('SHADOW DEFEATED', `Requires ${resummonMpCost} MP to resummon! (Current: ${Math.round(state.player.mana)} MP)`, 'danger');
+        return;
+      }
+      sound.playExtraction?.();
+      set((s) => ({
+        player: { ...s.player, mana: Math.max(0, s.player.mana - resummonMpCost) },
+        shadows: s.shadows.map((sh) =>
+          sh.id === shadow.id
+            ? {
+                ...sh,
+                hp: sh.maxHp || 1000,
+                mp: sh.maxMp || 500,
+                isDead: false,
+                active: true,
+                status: 'FOLLOWING',
+                commandedTargetId: null
+              }
+            : sh
+        )
+      }));
+      state.addNotification('SHADOW RESUMMONED', `${shadow.name} rises to fight by your side!`, 'shadow');
+      return;
+    }
+
+    // Context 2: Shadow is available (unlocked) but NOT summoned -> Z = SUMMON
+    if (!shadow.active || shadow.status === 'UNSUMMONED') {
+      const summonMpCost = 50;
+      if (state.player.mana < summonMpCost) {
+        state.addNotification('INSUFFICIENT MANA', `Summoning requires ${summonMpCost} MP! (Current: ${Math.round(state.player.mana)} MP)`, 'warning');
+        return;
+      }
+      sound.playExtraction?.();
+      set((s) => ({
+        player: { ...s.player, mana: Math.max(0, s.player.mana - summonMpCost) },
+        shadows: s.shadows.map((sh) =>
+          sh.id === shadow.id
+            ? {
+                ...sh,
+                hp: sh.hp > 0 ? sh.hp : (sh.maxHp || 1000),
+                mp: sh.mp !== undefined ? sh.mp : (sh.maxMp || 500),
+                isDead: false,
+                active: true,
+                status: 'FOLLOWING',
+                commandedTargetId: null
+              }
+            : sh
+        )
+      }));
+      state.addNotification('SHADOW SUMMONED', `${shadow.name} summoned to your side!`, 'shadow');
+      return;
+    }
+
+    // Context 3: Shadow is ALREADY SUMMONED -> Z = COMMAND / ATTACK CURRENT TARGET
+    let targetId = state.lockedTargetId;
+    const living = getAllLivingEnemies();
+    if (!targetId || !living.some((e) => e.id === targetId && e.hp > 0)) {
+      const pPos = typeof window !== 'undefined' && window.__playerPos ? window.__playerPos : [0, 0.5, 24];
+      const nearest = getNearestEnemy(pPos, 30);
+      if (nearest && nearest.hp > 0) {
+        targetId = nearest.id;
+        set({ lockedTargetId: targetId });
+      }
+    }
+
+    if (targetId) {
+      const targetEnemy = living.find((e) => e.id === targetId);
+      const enemyName = targetEnemy?.name || 'hostile enemy';
+      sound.playSlash?.();
+      set((s) => ({
+        shadows: s.shadows.map((sh) =>
+          sh.id === shadow.id
+            ? { ...sh, commandedTargetId: targetId, status: 'CHASE' }
+            : sh
+        )
+      }));
+      state.addNotification('COMMAND: ATTACK', `Shadow charging at ${enemyName.toUpperCase()}!`, 'shadow');
+    } else {
+      state.addNotification('NO TARGET', 'No hostile targets within range!', 'info');
+    }
+  },
+
+  // Direct summon action (can be called from UI buttons)
+  summonShadow: (shadowId) => {
+    const state = get();
+    const shadow = state.shadows.find((s) => s.id === shadowId) || state.shadows.find((s) => s.unlocked);
+    if (!shadow || !shadow.unlocked) return;
+    const cost = shadow.isDead ? 60 : 50;
+    if (state.player.mana < cost) {
+      state.addNotification('INSUFFICIENT MANA', `Requires ${cost} MP!`, 'warning');
+      return;
+    }
+    sound.playExtraction?.();
+    set((s) => ({
+      player: { ...s.player, mana: Math.max(0, s.player.mana - cost) },
+      shadows: s.shadows.map((sh) =>
+        sh.id === shadow.id
+          ? {
+              ...sh,
+              active: true,
+              isDead: false,
+              hp: sh.maxHp || 1000,
+              mp: sh.maxMp || 500,
+              status: 'FOLLOWING',
+              commandedTargetId: null
+            }
+          : sh
+      )
+    }));
+    state.addNotification('SHADOW SUMMONED', `${shadow.name} summoned!`, 'shadow');
+  },
+
+  // Authoritative C Key: Recall Shadow (Requirement 9)
+  recallShadow: () => {
+    const state = get();
+    const shadow = state.shadows.find((s) => s.active && !s.isDead);
+    if (!shadow) return;
+
+    sound.playRuneAcquire?.();
+    set((s) => ({
+      shadows: s.shadows.map((sh) =>
+        sh.id === shadow.id
+          ? { ...sh, commandedTargetId: null, status: 'RECALLING' }
+          : sh
+      )
+    }));
+    state.addNotification('RECALLING SHADOW...', 'Shadow returning to your side.', 'shadow');
+  },
+
+  // Authoritative Shadow Abilities 1, 2, 3, 4 (Requirement 7)
+  useShadowAbility: (slot) => {
+    const state = get();
+    const shadow = state.shadows.find((s) => s.active && !s.isDead);
+    if (!shadow) {
+      state.addNotification('NO SHADOW SUMMONED', 'Summon your Shadow with [ Z ] first!', 'warning');
+      return;
+    }
+
+    const abilities = {
+      1: { name: 'Shadow Slash', mp: 30, dmg: 180 },
+      2: { name: 'Shadow Guard', mp: 50, duration: 6 },
+      3: { name: 'Shadow Step', mp: 40 },
+      4: { name: 'Dark Strike', mp: 80, dmg: 320 }
+    };
+
+    const ab = abilities[slot];
+    if (!ab) return;
+
+    const nowSec = Date.now() / 1000;
+    const cdExpires = state.shadowCooldowns?.[slot] || 0;
+    if (nowSec < cdExpires) {
+      const remaining = Math.max(0.1, cdExpires - nowSec);
+      state.addNotification('ABILITY ON COOLDOWN', `${ab.name} recharging (${remaining.toFixed(1)}s remaining)!`, 'warning');
+      return;
+    }
+
+    const curMp = shadow.mp !== undefined ? shadow.mp : 500;
+    if (curMp < ab.mp) {
+      state.addNotification('INSUFFICIENT SHADOW MP', `${ab.name} requires ${ab.mp} Shadow MP! (Have: ${Math.round(curMp)})`, 'warning');
+      return;
+    }
+
+    const cdDurations = { 1: 2.5, 2: 8.0, 3: 4.0, 4: 9.0 };
+
+    // Deduct Shadow MP (purely independent from Player MP) & record cooldown
+    set((s) => ({
+      shadows: s.shadows.map((sh) =>
+        sh.id === shadow.id ? { ...sh, mp: Math.max(0, curMp - ab.mp) } : sh
+      ),
+      shadowCooldowns: {
+        ...(s.shadowCooldowns || {}),
+        [slot]: Date.now() / 1000 + (cdDurations[slot] || 3.0)
+      },
+      shadowAbilityEvent: { slot, ability: ab, timestamp: Date.now() }
+    }));
+
+    if (slot === 1) {
+      sound.playShadowSlash?.();
+      state.addNotification('SHADOW ABILITY', 'Shadow Slash executed!', 'shadow');
+    } else if (slot === 2) {
+      sound.playRuneAcquire?.();
+      state.addNotification('SHADOW GUARD', 'Shadow Guard active (-70% damage reduction for 6s)!', 'shadow');
+      set((s) => ({
+        shadows: s.shadows.map((sh) =>
+          sh.id === shadow.id ? { ...sh, guardActive: true } : sh
+        )
+      }));
+      setTimeout(() => {
+        set((s) => ({
+          shadows: s.shadows.map((sh) =>
+            sh.id === shadow.id ? { ...sh, guardActive: false } : sh
+          )
+        }));
+      }, 6000);
+    } else if (slot === 3) {
+      sound.playDash?.();
+      state.addNotification('SHADOW STEP', 'Shadow Step executed behind target!', 'shadow');
+    } else if (slot === 4) {
+      sound.playHit?.(true);
+      state.addNotification('DARK STRIKE', 'Devastating Dark Strike unleashed!', 'shadow');
+    }
+  },
+
+  // Authoritative Shadow Damage Receiver (Requirement 6 & 8)
+  damageShadow: (amount) => {
+    const state = get();
+    const shadow = state.shadows.find((s) => s.active && !s.isDead);
+    if (!shadow) return;
+
+    let finalDmg = Math.max(1, amount);
+    if (shadow.guardActive) {
+      finalDmg = Math.max(1, Math.round(finalDmg * 0.3)); // 70% damage reduction
+    }
+
+    const currentHp = shadow.hp !== undefined ? shadow.hp : (shadow.maxHp || 1000);
+    const newHp = Math.max(0, currentHp - finalDmg);
+
+    // Floating combat text over Shadow (crimson color, does not touch player)
+    const pPos = typeof window !== 'undefined' && window.__playerPos ? window.__playerPos : [0, 0.5, 24];
+    state.addDamageText(`-${finalDmg}`, [pPos[0] - 2.2, 2.0, pPos[2] + 2.4], false, true);
+
+    set((s) => ({
+      shadows: s.shadows.map((sh) =>
+        sh.id === shadow.id
+          ? {
+              ...sh,
+              hp: newHp,
+              isDead: newHp <= 0,
+              status: newHp <= 0 ? 'DEFEATED' : sh.status
+            }
+          : sh
+      ),
+      shadowHitEvent: { damage: finalDmg, timestamp: Date.now() }
+    }));
+
+    if (newHp <= 0) {
+      state.addNotification('SHADOW DEFEATED', 'Your Shadow Soldier has been defeated! Revive with [ Z ].', 'danger');
+    }
+  },
+
+  // Authoritative Shadow Status Updater
+  setShadowStatus: (status) => {
+    set((state) => ({
+      shadows: state.shadows.map((sh) =>
+        sh.active && !sh.isDead ? { ...sh, status } : sh
+      )
+    }));
   },
 
   toggleShadowActive: (shadowId) => {
@@ -1151,7 +1654,7 @@ export const useGameStore = create((set, get) => ({
 
       const updated = state.shadows.map((s) => {
         if (s.id === shadowId) {
-          return { ...s, active: !s.active };
+          return { ...s, active: !s.active, status: !s.active ? 'FOLLOWING' : 'UNSUMMONED' };
         }
         return s;
       });

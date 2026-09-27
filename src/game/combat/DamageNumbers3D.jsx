@@ -52,13 +52,15 @@ const SingleDamageNumber = React.memo(({ item }) => {
           fontSize: isCrit ? '26px' : '18px',
           color: textColor,
           textShadow,
-          whiteSpace: 'nowrap',
+          whiteSpace: 'pre-line',
+          textAlign: 'center',
           letterSpacing: isCrit ? '2px' : '1px',
           animation: 'floatDamage 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
           willChange: 'transform, opacity',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          gap: '4px'
+          gap: '2px'
         }}
       >
         {isCrit && (

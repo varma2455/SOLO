@@ -1,95 +1,133 @@
-import React, { useEffect } from 'react';
-import { useGameStore } from './store/gameStore';
-import { GameCanvas } from './game/GameCanvas';
-import { HUD } from './ui/HUD';
-import { MainMenu } from './ui/MainMenu';
-import { CharacterScreen } from './ui/CharacterScreen';
-import { InventoryScreen } from './ui/InventoryScreen';
-import { ShadowArmyScreen } from './ui/ShadowArmyScreen';
-import { SettingsModal } from './ui/SettingsModal';
-import { GameOverScreen } from './ui/GameOverScreen';
-import { NotificationToast } from './ui/NotificationToast';
-import { ExtractionModal } from './ui/ExtractionModal';
-import { MonsterDiscoveryModal } from './ui/MonsterDiscoveryModal';
-import { SavePrepareModal } from './ui/SavePrepareModal';
-import { BattleCountdown } from './ui/BattleCountdown';
-import { VictoryModal } from './ui/VictoryModal';
-import { SafePointModal } from './ui/SafePointModal';
-import { SaveIndicator } from './ui/SaveIndicator';
-import { ErrorBoundary } from './ui/ErrorBoundary';
+// -------------------------------------------------------------
+// SHADOW ASCENSION - MAIN APPLICATION ROUTING
+// Custom Authentication with Admin & User Role Isolation
+// -------------------------------------------------------------
+
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { CustomAuthProvider } from './context/CustomAuthContext';
+import { ProtectedAdminRoute } from './components/ProtectedAdminRoute';
+import { ProtectedUserRoute } from './components/ProtectedUserRoute';
+
+import { HomePage } from './pages/HomePage';
+import { UnifiedLoginPage } from './pages/UnifiedLoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { GameRoute } from './pages/GameRoute';
+import { AdminControlCenter } from './pages/AdminControlCenter';
+import { AdminUserProfile } from './pages/admin/AdminUserProfile';
+
+import { UserDashboard } from './pages/user/UserDashboard';
+import { UserProfile } from './pages/user/UserProfile';
+import { UserShadows } from './pages/user/UserShadows';
+import { UserInventory } from './pages/user/UserInventory';
+import { UserQuests } from './pages/user/UserQuests';
+import { UserSettings } from './pages/user/UserSettings';
 
 export const App = () => {
-  const currentScreen = useGameStore((s) => s.currentScreen);
-  const setScreen = useGameStore((s) => s.setScreen);
-  const recalculateStats = useGameStore((s) => s.recalculateStats);
-
-  // Initialize stats on mount
-  useEffect(() => {
-    recalculateStats();
-  }, []);
-
-  // Global hotkeys for menu screens
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!e.key) return;
-      const tagName = e.target?.tagName ? e.target.tagName.toLowerCase() : '';
-      if (['input', 'textarea'].includes(tagName)) return;
-
-      const key = e.key.toLowerCase();
-
-      if (key === 'c') {
-        setScreen(currentScreen === 'character' ? 'game' : 'character');
-      } else if (key === 'i' || key === 'b') {
-        setScreen(currentScreen === 'inventory' ? 'game' : 'inventory');
-      } else if (key === 'y') {
-        setScreen(currentScreen === 'shadows' ? 'game' : 'shadows');
-      } else if (key === 'escape') {
-        if (currentScreen !== 'game' && currentScreen !== 'menu') {
-          setScreen('game');
-        } else if (currentScreen === 'game') {
-          setScreen('settings');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentScreen]);
-
   return (
-    <ErrorBoundary onReturnToMenu={() => setScreen('menu')}>
-      <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', backgroundColor: '#07070b' }}>
-        {/* 3D Gameplay World Canvas (active when playing or browsing in-game menus) */}
-        {currentScreen !== 'menu' && <GameCanvas />}
+    <CustomAuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Landing & Authentication Pages */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<UnifiedLoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+          <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
-        {/* In-Game HUD (active during game mode) */}
-        {currentScreen === 'game' && <HUD />}
+          {/* Protected Administrator Routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAdminRoute>
+                <Navigate to="/admin/dashboard" replace />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users/:userId"
+            element={
+              <ProtectedAdminRoute>
+                <AdminUserProfile />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/:tab"
+            element={
+              <ProtectedAdminRoute>
+                <AdminControlCenter />
+              </ProtectedAdminRoute>
+            }
+          />
 
-        {/* Non-intrusive Save Indicator */}
-        <SaveIndicator />
+          {/* Protected Hunter/User Routes */}
+          <Route
+            path="/user/dashboard"
+            element={
+              <ProtectedUserRoute>
+                <UserDashboard />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/game"
+            element={
+              <ProtectedUserRoute>
+                <GameRoute />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/profile"
+            element={
+              <ProtectedUserRoute>
+                <UserProfile />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/shadows"
+            element={
+              <ProtectedUserRoute>
+                <UserShadows />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/inventory"
+            element={
+              <ProtectedUserRoute>
+                <UserInventory />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/quests"
+            element={
+              <ProtectedUserRoute>
+                <UserQuests />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/user/settings"
+            element={
+              <ProtectedUserRoute>
+                <UserSettings />
+              </ProtectedUserRoute>
+            }
+          />
 
-        {/* Explore-First Decision & Transition Modals */}
-        <MonsterDiscoveryModal />
-        <SavePrepareModal />
-        <BattleCountdown />
-        <VictoryModal />
-        <SafePointModal />
+          {/* Direct game access mapping */}
+          <Route path="/game" element={<GameRoute />} />
+          <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
 
-        {/* Screen Modals & Menus */}
-        {currentScreen === 'menu' && <MainMenu />}
-        {currentScreen === 'character' && <CharacterScreen />}
-        {currentScreen === 'inventory' && <InventoryScreen />}
-        {currentScreen === 'shadows' && <ShadowArmyScreen />}
-        {currentScreen === 'settings' && <SettingsModal />}
-        {currentScreen === 'gameover' && <GameOverScreen />}
-
-        {/* Notification Toast Banners */}
-        <NotificationToast />
-
-        {/* Soul Extraction Overlay Modal */}
-        <ExtractionModal />
-      </div>
-    </ErrorBoundary>
+          {/* Catch-all Fallback to Home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </CustomAuthProvider>
   );
 };
 

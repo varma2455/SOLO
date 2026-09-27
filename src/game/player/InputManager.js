@@ -16,7 +16,14 @@ class InputManager {
       skill: false,
       ultimate: false,
       interact: false,
-      targetLock: false
+      targetLock: false,
+      shadowSummon: false,
+      shadowTarget: false,
+      shadowRecall: false,
+      shadowSkill1: false,
+      shadowSkill2: false,
+      shadowSkill3: false,
+      shadowSkill4: false
     };
 
     this.mouse = {
@@ -70,6 +77,27 @@ class InputManager {
         e.preventDefault?.();
         this.keys.targetLock = true;
       }
+      if (code === 'KeyZ' || key === 'z') {
+        this.keys.shadowSummon = true;
+      }
+      if (code === 'KeyX' || key === 'x') {
+        this.keys.shadowTarget = true;
+      }
+      if (code === 'KeyC' || key === 'c') {
+        this.keys.shadowRecall = true;
+      }
+      if (code === 'Digit1' || key === '1') {
+        this.keys.shadowSkill1 = true;
+      }
+      if (code === 'Digit2' || key === '2') {
+        this.keys.shadowSkill2 = true;
+      }
+      if (code === 'Digit3' || key === '3') {
+        this.keys.shadowSkill3 = true;
+      }
+      if (code === 'Digit4' || key === '4') {
+        this.keys.shadowSkill4 = true;
+      }
 
       this.notify();
     };
@@ -104,6 +132,27 @@ class InputManager {
       }
       if (code === 'Tab' || key === 'tab') {
         this.keys.targetLock = false;
+      }
+      if (code === 'KeyZ' || key === 'z') {
+        this.keys.shadowSummon = false;
+      }
+      if (code === 'KeyX' || key === 'x') {
+        this.keys.shadowTarget = false;
+      }
+      if (code === 'KeyC' || key === 'c') {
+        this.keys.shadowRecall = false;
+      }
+      if (code === 'Digit1' || key === '1') {
+        this.keys.shadowSkill1 = false;
+      }
+      if (code === 'Digit2' || key === '2') {
+        this.keys.shadowSkill2 = false;
+      }
+      if (code === 'Digit3' || key === '3') {
+        this.keys.shadowSkill3 = false;
+      }
+      if (code === 'Digit4' || key === '4') {
+        this.keys.shadowSkill4 = false;
       }
 
       this.notify();
@@ -164,7 +213,14 @@ class InputManager {
       e: 'dash',
       q: 'skill',
       r: 'ultimate',
-      f: 'interact'
+      f: 'interact',
+      z: 'shadowSummon',
+      x: 'shadowTarget',
+      c: 'shadowRecall',
+      '1': 'shadowSkill1',
+      '2': 'shadowSkill2',
+      '3': 'shadowSkill3',
+      '4': 'shadowSkill4'
     };
     const keyName = keyMap[name?.toLowerCase()] || name;
     if (this.keys[keyName] !== undefined) {

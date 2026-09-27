@@ -48,19 +48,13 @@ export const AbyssWardenBoss = ({ playerPos, onBossAttackPlayer, onBossDefeated,
     return { rootModel: res.root, nodes: res.nodes, animController: anim };
   }, []);
 
-  // Dispose memory on unmount
+  // Safe cleanup on unmount: detach model references without destroying shared geometries or materials
   useEffect(() => {
     return () => {
       if (rootModel) {
-        rootModel.traverse((child) => {
-          if (child.isMesh) {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
-              else child.material.dispose();
-            }
-          }
-        });
+        if (rootModel.parent) {
+          rootModel.parent.remove(rootModel);
+        }
       }
     };
   }, [rootModel]);

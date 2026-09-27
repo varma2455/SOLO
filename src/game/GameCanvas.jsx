@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
@@ -38,6 +38,46 @@ const CanvasMetricsCollector = () => {
       }
     }
   });
+  return null;
+};
+
+// WebGL Context Loss Handler and Global 3D Recovery System (Requirement 16)
+const WebGLContextManager = () => {
+  const { gl, camera } = useThree();
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handleContextLost = (e) => {
+      e.preventDefault();
+      console.warn('[3D Engine] WebGL Context Lost! Requesting context restoration...');
+    };
+    const handleContextRestored = () => {
+      console.log('[3D Engine] WebGL Context Restored successfully.');
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+
+    window.__recover3D = () => {
+      console.log('[3D Engine] Executing Safe 3D Recovery...');
+      const store = useGameStore.getState();
+      const currentRoom = store.dungeon?.currentRoom || 1;
+      const safeZ = currentRoom === 1 ? 8 : currentRoom === 2 ? -50 : currentRoom === 3 ? -85 : -125;
+      if (window.__setPlayerPosition) {
+        window.__setPlayerPosition(0, 1.0, safeZ);
+      }
+      if (window.__resetCamera) {
+        window.__resetCamera();
+      }
+      camera.position.set(0, 3.6, safeZ + 6.4);
+      camera.lookAt(0, 1.2, safeZ);
+      camera.updateProjectionMatrix();
+      return true;
+    };
+
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+    };
+  }, [gl, camera]);
   return null;
 };
 
@@ -89,7 +129,8 @@ const FallbackDungeon = () => (
 export const GameCanvas = () => {
   const setScreen = useGameStore((s) => s.setScreen);
   const graphicsQuality = useGameStore((s) => s.graphicsQuality || 'high');
-  const playerPos = useMemo(() => [0, 0.5, 20], []);
+  const storePlayerPos = useGameStore((s) => s.player.position);
+  const playerPos = storePlayerPos || [0, 1.0, 8];
 
 
   // Check WebGL availability
@@ -127,8 +168,8 @@ export const GameCanvas = () => {
     setActiveEffects((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
-  const handleShadowAttack = useCallback((shadow, enemyId, power) => {
-    setShadowAttackEvent({ shadow, enemyId, power, id: Date.now() });
+  const handleShadowAttack = useCallback((shadow, enemyId, power, abilityName = 'SHADOW SLASH') => {
+    setShadowAttackEvent({ shadow, enemyId, power, abilityName, id: Date.now() });
   }, []);
 
   // If WebGL is not available on this browser/machine
@@ -222,15 +263,24 @@ export const GameCanvas = () => {
             powerPreference: 'default',
             failIfMajorPerformanceCaveat: false,
             alpha: false,
-            depth: true
+            depth: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.0
           }}
-          onCreated={({ scene }) => {
+          onCreated={({ scene, gl }) => {
             // Visible dark fantasy background (never pure pitch black)
-            scene.background = new THREE.Color('#0d0c15');
+            scene.background = new THREE.Color('#07070b');
             // Atmospheric volumetric-looking dungeon fog
-            scene.fog = new THREE.Fog('#0d0c15', 22, 105);
+            scene.fog = new THREE.Fog('#07070b', 22, 105);
+            gl.setClearColor('#07070b', 1.0);
           }}
         >
+          {/* Declarative scene background ensures buffer is never white */}
+          <color attach="background" args={['#07070b']} />
+
+          {/* WebGL context manager and recovery engine */}
+          <WebGLContextManager />
+
           {/* Engine metrics collector for HUD performance overlay */}
           <CanvasMetricsCollector />
 
@@ -250,7 +300,13 @@ export const GameCanvas = () => {
 
           {/* Summoned Shadows Following Player */}
           <ThreeErrorBoundary name="ShadowCompanions">
-            <ShadowCompanions playerPos={playerPos} onShadowAttack={handleShadowAttack} livingEnemies={livingEnemies} />
+            <ShadowCompanions
+              playerPos={playerPos}
+              onShadowAttack={handleShadowAttack}
+              onShadowAttackEnemy={handleShadowAttack}
+              livingEnemies={livingEnemies}
+              enemies={livingEnemies}
+            />
           </ThreeErrorBoundary>
 
           {/* Dynamic Dungeon Encounters & Enemies */}

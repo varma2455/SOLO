@@ -4,10 +4,74 @@
 // Checkpoints, and Corruption Recovery.
 // -------------------------------------------------------------
 
+import { auth } from '../firebase/config';
+import { saveUserGameData } from '../firebase/userService';
+import { recordPlayerSessionTelemetry } from '../firebase/gameDataService';
+
 export const SAVE_VERSION = 1;
 export const PRIMARY_SAVE_KEY = 'shadow_ascension_save_v1';
 export const BACKUP_SAVE_KEY = 'shadow_ascension_save_backup_v1';
 export const CHECKPOINT_KEY = 'shadow_ascension_checkpoint_v1';
+
+/**
+ * Get or generate persistent anonymous browser session ID (e.g. SA-9X4B2K)
+ */
+export function getOrCreateGameSessionId() {
+  let id = localStorage.getItem('shadow_ascension_session_id');
+  if (!id || !id.startsWith('SA-')) {
+    const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+    id = `SA-${rand}`;
+    localStorage.setItem('shadow_ascension_session_id', id);
+  }
+  return id;
+}
+
+/**
+ * Get locally stored hunter player profile
+ */
+export function getLocalPlayerProfile() {
+  try {
+    const raw = localStorage.getItem('shadow_ascension_player');
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object' && data.name) {
+        return data;
+      }
+    }
+  } catch (e) {
+    // Ignore error
+  }
+  return { name: 'AWAKENED HUNTER' };
+}
+
+/**
+ * Store updated hunter player profile locally
+ */
+export function setLocalPlayerProfile(profile) {
+  try {
+    const existing = getLocalPlayerProfile();
+    const merged = { ...existing, ...profile };
+    localStorage.setItem('shadow_ascension_player', JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    return profile;
+  }
+}
+
+export function getPrimarySaveKey(uid) {
+  const targetUid = uid || auth.currentUser?.uid || getOrCreateGameSessionId();
+  return targetUid ? `shadow_ascension_save_v1_${targetUid}` : PRIMARY_SAVE_KEY;
+}
+
+export function getBackupSaveKey(uid) {
+  const targetUid = uid || auth.currentUser?.uid || getOrCreateGameSessionId();
+  return targetUid ? `shadow_ascension_save_backup_v1_${targetUid}` : BACKUP_SAVE_KEY;
+}
+
+export function getCheckpointKey(uid) {
+  const targetUid = uid || auth.currentUser?.uid || getOrCreateGameSessionId();
+  return targetUid ? `shadow_ascension_checkpoint_v1_${targetUid}` : CHECKPOINT_KEY;
+}
 
 // Save event listeners for UI indicator
 const saveStatusListeners = new Set();
@@ -76,7 +140,7 @@ export function validateSaveData(data) {
     }
 
     const player = {
-      name: typeof rawP.name === 'string' && rawP.name.trim() ? rawP.name.trim() : 'Kael',
+      name: typeof rawP.name === 'string' && rawP.name.trim() ? rawP.name.trim() : 'AWAKENED HUNTER',
       level,
       xp: Math.max(0, Math.floor(Number(rawP.xp) || 0)),
       maxXp: Math.max(50, Math.floor(Number(rawP.maxXp) || 100)),
@@ -192,16 +256,22 @@ export function validateSaveData(data) {
 
 export const SaveManager = {
   /**
-   * Save game state with dual-state automatic backup.
-   * Primary save -> Backup save on each write.
+   * Save game state with dual-state automatic backup per user UID.
+   * Primary save -> Backup save on each write -> Firebase cloud sync.
    */
   saveGame(stateData, options = {}) {
     notifySaveStatus('saving', 'SAVING...');
+
+    const targetUid = options.uid || stateData.uid || auth.currentUser?.uid || null;
+    const primaryKey = getPrimarySaveKey(targetUid);
+    const backupKey = getBackupSaveKey(targetUid);
+    const checkpointKey = getCheckpointKey(targetUid);
 
     try {
       const dataToSave = {
         version: SAVE_VERSION,
         timestamp: Date.now(),
+        uid: targetUid,
         player: stateData.player,
         dungeon: stateData.dungeon,
         inventory: stateData.inventory,
@@ -216,23 +286,63 @@ export const SaveManager = {
 
       // If saving checkpoint
       if (options.isCheckpoint) {
-        localStorage.setItem(CHECKPOINT_KEY, serialized);
+        localStorage.setItem(checkpointKey, serialized);
       }
 
       // Roll previous primary to backup save
-      const existingPrimary = localStorage.getItem(PRIMARY_SAVE_KEY);
+      const existingPrimary = localStorage.getItem(primaryKey);
       if (existingPrimary) {
         try {
-          // Verify existing primary is valid JSON before backing it up
           JSON.parse(existingPrimary);
-          localStorage.setItem(BACKUP_SAVE_KEY, existingPrimary);
+          localStorage.setItem(backupKey, existingPrimary);
         } catch {
           // Don't overwrite backup with broken primary
         }
       }
 
       // Write new primary save
-      localStorage.setItem(PRIMARY_SAVE_KEY, serialized);
+      localStorage.setItem(primaryKey, serialized);
+
+      // Sync to Firebase in background if authenticated
+      if (targetUid) {
+        saveUserGameData(targetUid, {
+          displayName: stateData.player?.name,
+          level: stateData.player?.level,
+          xp: stateData.player?.xp,
+          maxXp: stateData.player?.maxXp,
+          hp: stateData.player?.hp,
+          maxHp: stateData.player?.maxHp,
+          mp: stateData.player?.mana,
+          maxMp: stateData.player?.maxMana,
+          gold: stateData.player?.gold,
+          shadowCores: stateData.player?.shadowCores,
+          completedRooms: stateData.dungeon?.currentRoom || 1,
+          monstersDefeated: stateData.dungeon?.monstersDefeated || 0,
+          inventory: stateData.inventory,
+          equipment: stateData.equipment,
+          shadows: stateData.shadows,
+          quests: stateData.quests,
+          stats: stateData.player?.attributes,
+          dungeon: {
+            name: stateData.dungeon?.name,
+            rank: stateData.dungeon?.rank,
+            seed: stateData.dungeon?.seed,
+            currentRoom: stateData.dungeon?.currentRoom
+          },
+          position: stateData.player?.position,
+          rotation: stateData.player?.rotation
+        }).catch((err) => console.warn('Cloud sync error:', err));
+      }
+
+      // Anonymous session telemetry recording for admin control center
+      recordPlayerSessionTelemetry({
+        sessionId: targetUid || getOrCreateGameSessionId(),
+        playerName: stateData.player?.name,
+        level: stateData.player?.level,
+        roomReached: stateData.dungeon?.currentRoom || 1,
+        monstersSlain: stateData.dungeon?.monstersDefeated || 0,
+        shadowsExtracted: Array.isArray(stateData.shadows) ? stateData.shadows.length : 0
+      }).catch(() => {});
 
       setTimeout(() => {
         notifySaveStatus('saved', 'SAVED');
@@ -249,10 +359,14 @@ export const SaveManager = {
   },
 
   /**
-   * Load game state with corruption failover to backup save.
+   * Load game state for specific user with corruption failover to backup save.
    */
-  loadGame() {
-    let raw = localStorage.getItem(PRIMARY_SAVE_KEY);
+  loadGame(uid) {
+    const targetUid = uid || auth.currentUser?.uid || null;
+    const primaryKey = getPrimarySaveKey(targetUid);
+    const backupKey = getBackupSaveKey(targetUid);
+
+    let raw = localStorage.getItem(primaryKey);
     let usedBackup = false;
 
     // Try primary
@@ -269,7 +383,7 @@ export const SaveManager = {
     }
 
     // Try backup if primary failed or was invalid
-    raw = localStorage.getItem(BACKUP_SAVE_KEY);
+    raw = localStorage.getItem(backupKey);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -277,7 +391,7 @@ export const SaveManager = {
         if (valid && sanitized) {
           usedBackup = true;
           // Re-establish primary from backup
-          localStorage.setItem(PRIMARY_SAVE_KEY, JSON.stringify(sanitized));
+          localStorage.setItem(primaryKey, JSON.stringify(sanitized));
           return { success: true, data: sanitized, fromBackup: true };
         }
       } catch (e) {
@@ -291,8 +405,10 @@ export const SaveManager = {
   /**
    * Load battle checkpoint saved immediately before entering combat.
    */
-  loadCheckpoint() {
-    const raw = localStorage.getItem(CHECKPOINT_KEY);
+  loadCheckpoint(uid) {
+    const targetUid = uid || auth.currentUser?.uid || null;
+    const checkpointKey = getCheckpointKey(targetUid);
+    const raw = localStorage.getItem(checkpointKey);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -305,21 +421,25 @@ export const SaveManager = {
       }
     }
     // Fall back to main save
-    return this.loadGame();
+    return this.loadGame(targetUid);
   },
 
   /**
-   * Check if any valid save exists (primary or backup).
+   * Check if any valid save exists for user.
    */
-  hasSaveGame() {
-    return Boolean(this.getSaveSummary());
+  hasSaveGame(uid) {
+    return Boolean(this.getSaveSummary(uid));
   },
 
   /**
-   * Get metadata summary of the most recent valid save for display in Main Menu.
+   * Get metadata summary of the most recent valid save for display.
    */
-  getSaveSummary() {
-    for (const key of [PRIMARY_SAVE_KEY, BACKUP_SAVE_KEY]) {
+  getSaveSummary(uid) {
+    const targetUid = uid || auth.currentUser?.uid || null;
+    const primaryKey = getPrimarySaveKey(targetUid);
+    const backupKey = getBackupSaveKey(targetUid);
+
+    for (const key of [primaryKey, backupKey]) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       try {
@@ -347,7 +467,7 @@ export const SaveManager = {
             rank: sanitized.dungeon.rank,
             timestamp: sanitized.timestamp,
             timeAgo,
-            fromBackup: key === BACKUP_SAVE_KEY
+            fromBackup: key === backupKey
           };
         }
       } catch {
@@ -455,11 +575,17 @@ export const SaveManager = {
   },
 
   /**
-   * Delete all saves for a complete reset.
+   * Delete saves for current user or specified UID.
    */
-  deleteSave() {
-    localStorage.removeItem(PRIMARY_SAVE_KEY);
-    localStorage.removeItem(BACKUP_SAVE_KEY);
-    localStorage.removeItem(CHECKPOINT_KEY);
+  deleteSave(uid) {
+    const targetUid = uid || auth.currentUser?.uid || null;
+    localStorage.removeItem(getPrimarySaveKey(targetUid));
+    localStorage.removeItem(getBackupSaveKey(targetUid));
+    localStorage.removeItem(getCheckpointKey(targetUid));
+    if (!targetUid) {
+      localStorage.removeItem(PRIMARY_SAVE_KEY);
+      localStorage.removeItem(BACKUP_SAVE_KEY);
+      localStorage.removeItem(CHECKPOINT_KEY);
+    }
   }
 };

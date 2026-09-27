@@ -104,6 +104,30 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     };
   }, []);
 
+  const lastRoomRef = useRef(currentRoom);
+
+  // Safely reposition camera immediately on room transition (Requirement 6 & 18)
+  useEffect(() => {
+    if (lastRoomRef.current !== currentRoom) {
+      lastRoomRef.current = currentRoom;
+      if (playerPos.current && Number.isFinite(playerPos.current.x)) {
+        const safeY = Math.max(0.8, Math.min(7.0, playerPos.current.y + 2.6));
+        camera.position.set(
+          playerPos.current.x,
+          safeY,
+          playerPos.current.z + 6.4
+        );
+        camTarget.current.set(
+          playerPos.current.x,
+          safeY,
+          playerPos.current.z + 6.4
+        );
+        lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.2, playerPos.current.z);
+        camera.lookAt(lookTarget.current);
+      }
+    }
+  }, [currentRoom, camera]);
+
   // -------------------------------------------------------------
   // GLOBAL CONTROLLER HELPERS (For Automated & Interactive Testing)
   // -------------------------------------------------------------
@@ -132,6 +156,21 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
 
     window.__resetCamera = () => {
       inputManager.resetCamera();
+      if (playerPos.current && Number.isFinite(playerPos.current.x)) {
+        const safeY = Math.max(0.8, Math.min(7.0, playerPos.current.y + 2.6));
+        camera.position.set(
+          playerPos.current.x,
+          safeY,
+          playerPos.current.z + 6.4
+        );
+        camTarget.current.set(
+          playerPos.current.x,
+          safeY,
+          playerPos.current.z + 6.4
+        );
+        lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.2, playerPos.current.z);
+        camera.lookAt(lookTarget.current);
+      }
     };
 
     window.__moveForward = (duration = 400) => {
@@ -250,7 +289,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
   const handleBasicAttack = () => {
     const store = useGameStore.getState();
     const currentFlow = store.gameFlowState;
-    const isCombatAllowed = currentFlow === 'BATTLE' || store.dungeon.bossActive;
+    const isCombatAllowed = !['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow);
     if (!isCombatAllowed) return;
     if (attackAnim.current.isAttacking) return;
 
@@ -305,7 +344,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
   const handleSkillPress = (skillId) => {
     const store = useGameStore.getState();
     const currentFlow = store.gameFlowState;
-    const isCombatAllowed = currentFlow === 'BATTLE' || store.dungeon.bossActive;
+    const isCombatAllowed = !['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow);
     if (!isCombatAllowed) return;
 
     if (!store.canUseSkill(skillId)) return;
@@ -364,12 +403,47 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       const isLocked = ['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow);
       if (isLocked) return;
 
-      if (key === 'tab') {
-        e.preventDefault();
+      if (key === 'tab' || code === 'KeyX' || key === 'x') {
+        e.preventDefault?.();
         const store = useGameStore.getState();
         const living = getAllLivingEnemies();
-        store.toggleTargetLock(living);
-        sound.playRuneAcquire?.();
+        store.cycleTargetLock(living);
+        return;
+      }
+
+      if (code === 'KeyZ' || key === 'z') {
+        const store = useGameStore.getState();
+        store.summonOrCommandShadow();
+        return;
+      }
+
+      if (code === 'KeyC' || key === 'c') {
+        const store = useGameStore.getState();
+        store.recallShadow();
+        return;
+      }
+
+      if (code === 'Digit1' || key === '1') {
+        const store = useGameStore.getState();
+        store.useShadowAbility(1);
+        return;
+      }
+
+      if (code === 'Digit2' || key === '2') {
+        const store = useGameStore.getState();
+        store.useShadowAbility(2);
+        return;
+      }
+
+      if (code === 'Digit3' || key === '3') {
+        const store = useGameStore.getState();
+        store.useShadowAbility(3);
+        return;
+      }
+
+      if (code === 'Digit4' || key === '4') {
+        const store = useGameStore.getState();
+        store.useShadowAbility(4);
         return;
       }
 
@@ -403,7 +477,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
 
       if (['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow)) return;
 
-      const isCombat = currentFlow === 'BATTLE' || useGameStore.getState().dungeon.bossActive;
+      const isCombat = !['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow);
       if (e.button === 0 && isCombat) {
         handleBasicAttack();
       }
@@ -491,6 +565,17 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       }
     }
 
+    // Validate player position is finite. If not, restore to safe room coordinates! (Requirement 5 & 7)
+    if (
+      !Number.isFinite(playerPos.current.x) ||
+      !Number.isFinite(playerPos.current.y) ||
+      !Number.isFinite(playerPos.current.z)
+    ) {
+      const safeZ = currentRoom === 1 ? 8 : currentRoom === 2 ? -50 : currentRoom === 3 ? -85 : -125;
+      playerPos.current.set(0, 1.0, safeZ);
+      playerVelocity.current.set(0, 0, 0);
+    }
+
     // Outer boundary limits (generous, crash-free, no artificial gating)
     playerPos.current.x = Math.max(-20, Math.min(20, playerPos.current.x));
     playerPos.current.z = Math.max(-160, Math.min(27, playerPos.current.z));
@@ -510,6 +595,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     globalPlayerState.isInvulnerable = Boolean(isInvulnerable || dashState.current.active);
     if (typeof window !== 'undefined') {
       window.__playerPos = [playerPos.current.x, 1.0, playerPos.current.z];
+      window.__currentRoom = currentRoom;
     }
 
     // Real-time telemetry metrics for HUD overlay without re-renders
@@ -596,18 +682,49 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     } else {
       const camDist = dashState.current.isDashing ? 5.4 : 6.4;
       const camHeight = 2.6;
-      const camYaw = inputManager.mouse.yaw;
-      const camPitch = inputManager.mouse.pitch;
+      let camYaw = Number.isFinite(inputManager.mouse.yaw) ? inputManager.mouse.yaw : 0;
+      let camPitch = Number.isFinite(inputManager.mouse.pitch) ? inputManager.mouse.pitch : 0;
+      camPitch = Math.max(-0.65, Math.min(0.75, camPitch));
 
-      const camX = playerPos.current.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist + shakeX;
-      const camY = playerPos.current.y + camHeight + Math.sin(camPitch) * camDist * 0.6 + shakeY;
-      const camZ = playerPos.current.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+      let camX = playerPos.current.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist + shakeX;
+      let camY = playerPos.current.y + camHeight + Math.sin(camPitch) * camDist * 0.6 + shakeY;
+      let camZ = playerPos.current.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
 
-      camTarget.current.set(camX, Math.max(0.6, camY), camZ);
+      // Safe bounds clamping: height max 7.2 (avoids ceiling clipping), min 0.8
+      camY = Math.max(0.8, Math.min(7.2, camY));
+
+      if (!Number.isFinite(camX) || !Number.isFinite(camY) || !Number.isFinite(camZ)) {
+        camX = playerPos.current.x;
+        camY = playerPos.current.y + 2.6;
+        camZ = playerPos.current.z + 6.4;
+      }
+
+      camTarget.current.set(camX, camY, camZ);
       const damp = 1 - Math.exp(-20 * dt);
       camera.position.lerp(camTarget.current, damp);
+
+      // Validate camera position is finite; restore safe coords if corrupt (Requirement 5)
+      if (
+        !Number.isFinite(camera.position.x) ||
+        !Number.isFinite(camera.position.y) ||
+        !Number.isFinite(camera.position.z)
+      ) {
+        camera.position.set(camX, camY, camZ);
+      }
+
       lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.2, playerPos.current.z);
+      if (
+        !Number.isFinite(lookTarget.current.x) ||
+        !Number.isFinite(lookTarget.current.y) ||
+        !Number.isFinite(lookTarget.current.z)
+      ) {
+        lookTarget.current.set(playerPos.current.x, 1.2, playerPos.current.z);
+      }
       camera.lookAt(lookTarget.current);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.__cameraPos = [camera.position.x, camera.position.y, camera.position.z];
     }
   });
 

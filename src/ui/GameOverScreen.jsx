@@ -11,6 +11,7 @@ export const GameOverScreen = () => {
   const loadLastSave = useGameStore((s) => s.loadBattleCheckpoint || s.continueGame);
   const setScreen = useGameStore((s) => s.setScreen);
   const dungeon = useGameStore((s) => s.dungeon);
+  const player = useGameStore((s) => s.player);
 
   const roomName = dungeon.currentRoom === 4 ? 'Boss Chamber' : `Room ${dungeon.currentRoom}`;
 
@@ -41,8 +42,11 @@ export const GameOverScreen = () => {
           animation: 'modalSlideUp 0.3s ease-out'
         }}
       >
+        <div style={{ fontFamily: 'var(--font-cinzel)', fontSize: 16, letterSpacing: '3px', color: '#fca5a5', fontWeight: 900, marginBottom: 4 }}>
+          {player?.name?.toUpperCase() || 'AWAKENED HUNTER'}
+        </div>
         <div style={{ fontSize: 13, letterSpacing: '4px', color: '#f87171', fontWeight: 700, marginBottom: 8 }}>
-          MORTAL FORM SUCCUMBED
+          SHADOW DEFEATED
         </div>
 
         <h1
@@ -56,7 +60,7 @@ export const GameOverScreen = () => {
             textShadow: '0 0 30px rgba(239, 68, 68, 0.8)'
           }}
         >
-          DEFEATED
+          FALLEN
         </h1>
 
         <p style={{ color: '#d1d5db', fontSize: 15, margin: '0 0 20px 0', lineHeight: 1.6 }}>

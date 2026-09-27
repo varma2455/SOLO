@@ -11,6 +11,7 @@ export const VictoryModal = () => {
   const gameFlowState = useGameStore((s) => s.gameFlowState);
   const victoryData = useGameStore((s) => s.victoryData);
   const continueExploringAfterVictory = useGameStore((s) => s.continueExploringAfterVictory);
+  const player = useGameStore((s) => s.player);
 
   if (gameFlowState !== 'VICTORY' || !victoryData) return null;
 
@@ -60,8 +61,11 @@ export const VictoryModal = () => {
           </div>
         </div>
 
-        <div style={{ fontSize: 13, letterSpacing: '4px', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
-          VICTORY ACHIEVED
+        <div style={{ fontFamily: 'var(--font-cinzel)', fontSize: 16, letterSpacing: '3px', color: '#fbbf24', fontWeight: 900, marginBottom: 4 }}>
+          {player?.name?.toUpperCase() || 'AWAKENED HUNTER'}
+        </div>
+        <div style={{ fontSize: 13, letterSpacing: '4px', color: '#38bdf8', fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
+          DUNGEON COMPLETE
         </div>
 
         <h1

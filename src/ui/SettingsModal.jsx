@@ -230,7 +230,7 @@ export const SettingsModal = () => {
                 borderRadius: 4
               }}
             >
-              <div><strong style={{ color: '#fbbf24' }}>W / A / S / D</strong> &bull; Move Kael</div>
+              <div><strong style={{ color: '#fbbf24' }}>W / A / S / D</strong> &bull; Move Hunter</div>
               <div><strong style={{ color: '#fbbf24' }}>Mouse Move</strong> &bull; Free Look</div>
               <div><strong style={{ color: '#fbbf24' }}>Left Click (LMB)</strong> &bull; 3-Hit Combo</div>
               <div><strong style={{ color: '#fbbf24' }}>Q</strong> &bull; Shadow Slash</div>

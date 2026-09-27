@@ -18,7 +18,7 @@ import { LootItem, ExtractionBeacon } from '../combat/LootItem';
 import { sound } from '../../audio/soundManager';
 import { globalPlayerState } from '../player/Player';
 import { safeVector3, DEFAULT_PLAYER_POSITION } from '../../utils/vector3';
-import { getEnemyPosition } from '../combat/EnemyPositionTracker';
+import { getEnemyPosition, getAllLivingEnemies } from '../combat/EnemyPositionTracker';
 
 export const EnemyManager = ({
   playerPos,
@@ -170,14 +170,14 @@ export const EnemyManager = ({
 
   // Handle incoming attacks from summoned Shadow companions
   useEffect(() => {
-    if (!shadowAttackEvent || gameFlowState !== 'BATTLE') return;
-    handleShadowAttackEnemy(shadowAttackEvent.shadow, shadowAttackEvent.enemyId, shadowAttackEvent.power);
-  }, [shadowAttackEvent, gameFlowState]);
+    if (!shadowAttackEvent) return;
+    handleShadowAttackEnemy(shadowAttackEvent.shadow, shadowAttackEvent.enemyId, shadowAttackEvent.power, shadowAttackEvent.abilityName);
+  }, [shadowAttackEvent]);
 
-  // Process Basic & Dash Attack Hits (Active during BATTLE or Boss Encounter)
+  // Process Basic & Dash Attack Hits (Active during EXPLORING, BATTLE, or Boss Encounter)
   useEffect(() => {
-    const isCombat = gameFlowState === 'BATTLE' || dungeon.bossActive;
-    if (!combatAttackEvent || !isCombat) return;
+    const isLockedFlow = ['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(gameFlowState);
+    if (!combatAttackEvent || isLockedFlow) return;
     const { position, angle, multiplier, range, damage: explicitDamage, type: atkType, combo } = combatAttackEvent;
 
     const attackKey = atkType === 'dash' ? 'dash' : (combo ? `combo${combo}` : explicitDamage);
@@ -227,8 +227,8 @@ export const EnemyManager = ({
 
   // Process Skill Hits (Shadow Slash: 220, Eclipse Dominion: 800)
   useEffect(() => {
-    const isCombat = gameFlowState === 'BATTLE' || dungeon.bossActive;
-    if (!skillEvent || !isCombat) return;
+    const isLockedFlow = ['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(gameFlowState);
+    if (!skillEvent || isLockedFlow) return;
     const { skillId, position, angle, range, multiplier, damage: explicitDamage } = skillEvent;
     const skillKey = skillId || explicitDamage;
 
@@ -276,14 +276,16 @@ export const EnemyManager = ({
     );
   }, [skillEvent, gameFlowState, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
 
-  // Shadow Minions attacking enemies
-  const handleShadowAttackEnemy = (shadow, enemyId, attackPower) => {
+  // Shadow Minions attacking enemies (Requirement 3 & 14)
+  const handleShadowAttackEnemy = (shadow, enemyId, attackPower, abilityName = 'SHADOW SLASH') => {
     setEnemies((prev) =>
       prev.map((en) => {
         if (en.id === enemyId && en.hp > 0) {
-          const enPos = safeVector3(en.spawnPosition, [0, 1.5, 0], 'EnemyManager:shadowAtk');
+          const livePos = getEnemyPosition(en.id, en.spawnPosition);
+          const enPos = safeVector3(livePos, [0, 1.5, 0], 'EnemyManager:shadowAtk');
           const dmg = Math.round(attackPower * (0.9 + Math.random() * 0.2));
-          addDamageText(dmg, [enPos[0], 1.4, enPos[2]], false);
+          // Requirement 3: Show "SHADOW SLASH \n -120 HP"
+          addDamageText(`${abilityName}\n-${dmg} HP`, [enPos[0], 1.6, enPos[2]], false);
           return { ...en, hp: Math.max(0, en.hp - dmg) };
         }
         return en;
@@ -293,12 +295,12 @@ export const EnemyManager = ({
     // If attacking boss
     if (enemyId === 'abyssWarden' && dungeon.bossActive && dungeon.bossHp > 0) {
       const dmg = Math.round(attackPower * (0.9 + Math.random() * 0.2));
-      addDamageText(dmg, [0, 3.0, -138], false);
+      addDamageText(`${abilityName}\n-${dmg} HP`, [0, 3.0, -138], false);
       updateBossHp(dungeon.bossHp - dmg);
     }
   };
 
-  // Enemy Death Handler
+  // Enemy Death Handler (Requirement 13: ONLY dead enemy removed, other enemies remain!)
   const handleEnemyDeath = useCallback((enemy, deathPos) => {
     const safeDeath = safeVector3(deathPos, [0, 0.5, 0], 'EnemyManager:enemyDeath');
     gainXp(enemy.xpReward || 35);
@@ -306,12 +308,15 @@ export const EnemyManager = ({
 
     // Remove ONLY the dead enemy from the state and compute remaining alive in room
     setEnemies((prev) => {
-      const updated = prev.filter((e) => e.id !== enemy.id);
-      const enemyRoom = enemy.room || 1;
-      const aliveRemaining = updated.filter((e) => (e.room || 1) === enemyRoom && e.hp > 0).length;
-      recordMonsterDefeated(enemy.id, safeDeath, aliveRemaining);
-      return updated;
+      return prev.filter((e) => e.id !== enemy.id);
     });
+
+    setTimeout(() => {
+      const living = getAllLivingEnemies();
+      const enemyRoom = enemy.room || 1;
+      const aliveRemaining = living.filter((e) => (e.room || 1) === enemyRoom && e.hp > 0).length;
+      recordMonsterDefeated(enemy.id, safeDeath, aliveRemaining);
+    }, 50);
 
     // Spawn Loot Crystal
     const droppedItems = getRandomLoot(enemy.id?.split('_')[0] || 'ashGoblin');
@@ -327,16 +332,17 @@ export const EnemyManager = ({
     ]);
 
     // If extractable, calculate extraction chance and spawn soul extraction beacon
-    const rate = enemy.extractionRate || (enemy.tier === 'elite' ? 0.85 : 0.25);
-    if (enemy.extractable && Math.random() <= rate) {
+    const hasUnlocked = useGameStore.getState().shadows.some((s) => s.unlocked);
+    const rate = !hasUnlocked ? 1.0 : (enemy.extractionRate || (enemy.tier === 'elite' ? 0.85 : 0.45));
+    if ((enemy.extractable || !hasUnlocked) && Math.random() <= rate) {
       const beaconId = 'beacon_' + Math.random().toString(36).substring(2, 7);
       setBeacons((prev) => [
         ...prev,
         {
           id: beaconId,
-          name: enemy.shadowName || enemy.name,
-          rank: enemy.shadowRank || enemy.rank,
-          shadowId: enemy.shadowName?.toLowerCase().replace(/\s+/g, '_') || 'shadow_stalker',
+          name: enemy.shadowName || enemy.name || 'Dusk Knight',
+          rank: enemy.shadowRank || enemy.rank || 'C',
+          shadowId: 'dusk_knight',
           position: [safeDeath[0], 0.1, safeDeath[2]]
         }
       ]);
@@ -479,6 +485,7 @@ export const EnemyManager = ({
             playerPos={currentPPos}
             onEnemyDeath={handleEnemyDeath}
             onEnemyAttackPlayer={handleEnemyAttackPlayer}
+            onEnemyAttackShadow={(dmg) => useGameStore.getState().damageShadow(dmg)}
             commanderAlive={isCommanderAlive}
             onNearExecutable={handleNearExecutable}
             isDormant={dormant}

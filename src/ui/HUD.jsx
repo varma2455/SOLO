@@ -23,6 +23,26 @@ export const HUD = () => {
   const gameFlowState = useGameStore((s) => s.gameFlowState);
   const activeEncounter = useGameStore((s) => s.activeEncounter);
   const lockedTargetId = useGameStore((s) => s.lockedTargetId);
+  const shadowCooldowns = useGameStore((s) => s.shadowCooldowns || {});
+  const shadowAbilityEvent = useGameStore((s) => s.shadowAbilityEvent);
+  const shadowHitEvent = useGameStore((s) => s.shadowHitEvent);
+
+  // Responsive screen size tracking (Requirement 17)
+  const [screenSize, setScreenSize] = useState({
+    isMobile: typeof window !== 'undefined' ? window.innerWidth < 640 : false,
+    isTablet: typeof window !== 'undefined' ? window.innerWidth >= 640 && window.innerWidth < 1024 : false
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setScreenSize({
+        isMobile: window.innerWidth < 640,
+        isTablet: window.innerWidth >= 640 && window.innerWidth < 1024
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Time ticker for cooldown display
   const [, setTick] = useState(0);
@@ -30,6 +50,63 @@ export const HUD = () => {
     const timer = setInterval(() => setTick((t) => t + 1), 100);
     return () => clearInterval(timer);
   }, []);
+
+  // Shadow Command collapsed toggle state (remembers choice)
+  const [isShadowCmdCollapsed, setIsShadowCmdCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('solo_shadow_cmd_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleShadowCmdCollapsed = () => {
+    setIsShadowCmdCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('solo_shadow_cmd_collapsed', String(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  // Keyboard button feedback visual glow/press state (Requirement 14)
+  const [activeKeycaps, setActiveKeycaps] = useState({});
+  useEffect(() => {
+    const handleKeyFeedback = (e) => {
+      if (!e.key) return;
+      const tagName = e.target?.tagName ? e.target.tagName.toLowerCase() : '';
+      if (['input', 'textarea'].includes(tagName)) return;
+
+      const code = e.code;
+      const key = e.key.toLowerCase();
+      let k = null;
+      if (code === 'KeyZ' || key === 'z') k = 'z';
+      else if (code === 'KeyX' || key === 'x' || code === 'Tab') k = 'x';
+      else if (code === 'KeyC' || key === 'c') k = 'c';
+      else if (code === 'Digit1' || key === '1') k = '1';
+      else if (code === 'Digit2' || key === '2') k = '2';
+      else if (code === 'Digit3' || key === '3') k = '3';
+      else if (code === 'Digit4' || key === '4') k = '4';
+
+      if (k) {
+        setActiveKeycaps((prev) => ({ ...prev, [k]: true }));
+        setTimeout(() => {
+          setActiveKeycaps((prev) => ({ ...prev, [k]: false }));
+        }, 180);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyFeedback);
+    return () => window.removeEventListener('keydown', handleKeyFeedback);
+  }, []);
+
+  const triggerKeyFeedback = (k) => {
+    setActiveKeycaps((prev) => ({ ...prev, [k]: true }));
+    setTimeout(() => {
+      setActiveKeycaps((prev) => ({ ...prev, [k]: false }));
+    }, 180);
+  };
 
   // Real-time input & movement controller panel state
   const [controllerState, setControllerState] = useState({
@@ -40,7 +117,7 @@ export const HUD = () => {
     pos: [0, 1, 8],
     vel: [0, 0, 0],
     speed: 0,
-    collapsed: false
+    collapsed: true
   });
 
   useEffect(() => {
@@ -76,6 +153,7 @@ export const HUD = () => {
     drawCalls: 0,
     triangles: 0,
     textures: 0,
+    geometries: 0,
     memMB: null,
     playerPos: [0, 1, 8],
     playerVel: [0, 0, 0],
@@ -88,6 +166,7 @@ export const HUD = () => {
     livingCount: 0
   });
   const isDebug = typeof window !== 'undefined' && window.location.search.includes('debug=true');
+  const [debugCollapsed, setDebugCollapsed] = useState(false);
 
   useEffect(() => {
     let frames = 0;
@@ -131,6 +210,7 @@ export const HUD = () => {
           drawCalls: metrics.drawCalls || 0,
           triangles: metrics.triangles || 0,
           textures: metrics.textures || 0,
+          geometries: metrics.geometries || 0,
           memMB: mem,
           playerPos: [...livePlayerMetrics.pos],
           playerVel: [...livePlayerMetrics.vel],
@@ -203,50 +283,156 @@ export const HUD = () => {
   const activeQuest = quests.find((q) => !q.completed) || quests[0];
   const activeShadowsCount = shadows.filter((s) => s.active && s.unlocked).length;
 
+  // Dedicated Shadow Soldier State Derivations (Requirement 11)
+  const primaryShadow = shadows.find((s) => s.active && s.unlocked) || shadows.find((s) => s.unlocked) || shadows[0];
+  const isShadowAvailable = Boolean(primaryShadow && primaryShadow.unlocked);
+  const isShadowDead = Boolean(primaryShadow && (primaryShadow.isDead || primaryShadow.status === 'DEFEATED' || (primaryShadow.hp !== undefined && primaryShadow.hp <= 0)));
+  const isShadowSummoned = Boolean(primaryShadow && primaryShadow.active && !isShadowDead);
+
+  const shadowHp = primaryShadow ? Math.max(0, Math.round(primaryShadow.hp !== undefined ? primaryShadow.hp : 1000)) : 1000;
+  const shadowMaxHp = primaryShadow?.maxHp || 1000;
+  const shadowMp = primaryShadow ? Math.max(0, Math.round(primaryShadow.mp !== undefined ? primaryShadow.mp : 500)) : 500;
+  const shadowMaxMp = primaryShadow?.maxMp || 500;
+
+  let shadowStatus = 'UNSUMMONED';
+  if (!isShadowAvailable) {
+    shadowStatus = 'UNSUMMONED';
+  } else if (isShadowDead) {
+    shadowStatus = 'DEFEATED';
+  } else if (isShadowSummoned) {
+    const nowMs = Date.now();
+    if (primaryShadow.guardActive) {
+      shadowStatus = 'GUARDING';
+    } else if (shadowAbilityEvent?.slot === 3 && nowMs - (shadowAbilityEvent.timestamp || 0) < 1500) {
+      shadowStatus = 'SHADOW STEP';
+    } else if (shadowHitEvent && nowMs - (shadowHitEvent.timestamp || 0) < 500) {
+      shadowStatus = 'STAGGERED';
+    } else if (shadowHp <= shadowMaxHp * 0.25) {
+      shadowStatus = 'LOW HP';
+    } else if (primaryShadow.status === 'ATTACKING') {
+      shadowStatus = 'ATTACKING';
+    } else if (primaryShadow.status === 'CHASE') {
+      shadowStatus = 'CHASING';
+    } else if (primaryShadow.status === 'RECALLING') {
+      shadowStatus = 'RECALLING';
+    } else {
+      shadowStatus = primaryShadow.status || 'FOLLOWING';
+    }
+  } else {
+    shadowStatus = 'UNSUMMONED';
+  }
+
+  const getShadowStatusColor = (status) => {
+    switch (status) {
+      case 'FOLLOWING': return '#38bdf8';
+      case 'TARGETING':
+      case 'CHASING': return '#60a5fa';
+      case 'ATTACKING': return '#c084fc';
+      case 'GUARDING': return '#34d399';
+      case 'SHADOW STEP': return '#fbbf24';
+      case 'LOW HP': return '#f97316';
+      case 'DEFEATED': return '#ef4444';
+      case 'RECALLING': return '#818cf8';
+      case 'STAGGERED': return '#fbbf24';
+      case 'UNSUMMONED':
+      default: return '#9ca3af';
+    }
+  };
+
+  const livingEnemiesList = getAllLivingEnemies();
+  const lockedEnemyObj = lockedTargetId ? livingEnemiesList.find((e) => e.id === lockedTargetId) : null;
+  const lockedTargetEnemyName = lockedEnemyObj ? (lockedEnemyObj.name || lockedEnemyObj.id).toUpperCase() : 'HOSTILE';
+
+  let shadowTargetName = 'NONE';
+  if (isShadowSummoned) {
+    const curTargetId = primaryShadow.commandedTargetId || lockedTargetId;
+    if (curTargetId) {
+      const found = livingEnemiesList.find((e) => e.id === curTargetId);
+      if (found) {
+        shadowTargetName = (found.name || found.id).toUpperCase();
+      }
+    }
+    if (shadowTargetName === 'NONE' && typeof window !== 'undefined' && window.__shadowState?.targetName) {
+      shadowTargetName = window.__shadowState.targetName.toUpperCase();
+    }
+  }
+
+  const shadowHpPercent = Math.max(0, Math.min(100, (shadowHp / shadowMaxHp) * 100));
+  const shadowMpPercent = Math.max(0, Math.min(100, (shadowMp / shadowMaxMp) * 100));
+
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
-      {/* Debug Engine Performance Monitor when ?debug=true */}
+    <div id="game-hud" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+      {/* Collapsible 3D Engine Status Monitor when ?debug=true (Requirement 5 & 17) */}
       {isDebug && (
         <div
+          id="debug-engine-status-panel"
           style={{
             position: 'absolute',
             bottom: 12,
             left: 12,
             padding: '10px 14px',
-            background: 'rgba(5, 5, 12, 0.92)',
-            border: '1px solid rgba(16, 185, 129, 0.65)',
+            background: 'rgba(5, 5, 12, 0.94)',
+            border: '1px solid rgba(56, 189, 248, 0.65)',
             borderRadius: '6px',
-            color: '#34d399',
+            color: '#38bdf8',
             fontFamily: 'monospace',
             fontSize: 11.5,
             lineHeight: 1.5,
             zIndex: 99,
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.85)',
-            minWidth: 260
+            minWidth: 280
           }}
         >
-          <div style={{ fontWeight: 800, color: '#6ee7b7', borderBottom: '1px solid rgba(16,185,129,0.3)', paddingBottom: 3, marginBottom: 5, letterSpacing: '0.5px' }}>
-            ENGINE TELEMETRY (?debug=true)
+          <div
+            onClick={() => setDebugCollapsed((prev) => !prev)}
+            style={{
+              fontWeight: 800,
+              color: '#38bdf8',
+              borderBottom: '1px solid rgba(56, 189, 248, 0.3)',
+              paddingBottom: 3,
+              marginBottom: 5,
+              letterSpacing: '0.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <span>◆ 3D ENGINE STATUS</span>
+            <span style={{ fontSize: 10, color: '#94a3b8' }}>{debugCollapsed ? '[EXPAND]' : '[COLLAPSE]'}</span>
           </div>
-          <div>FPS: <span style={{ color: debugStats.fps >= 55 ? '#34d399' : debugStats.fps >= 30 ? '#fbbf24' : '#f87171', fontWeight: 800 }}>{debugStats.fps}</span> <span style={{ color: '#9ca3af' }}>({debugStats.frameTime} ms)</span></div>
-          <div>Pos: <span style={{ color: '#f3f4f6' }}>[{debugStats.playerPos.map((n) => Number(n).toFixed(1)).join(', ')}]</span></div>
-          <div>Vel: <span style={{ color: '#60a5fa' }}>[{debugStats.playerVel.map((n) => Number(n).toFixed(2)).join(', ')}]</span> <span style={{ color: '#9ca3af' }}>({debugStats.playerSpeed.toFixed(1)} m/s)</span></div>
-          <div>Cam: <span style={{ color: '#f3f4f6' }}>[{debugStats.camPos.map((n) => Number(n).toFixed(1)).join(', ')}]</span></div>
-          <div>
-            Input: <span style={{ color: debugStats.keys.w ? '#34d399' : '#6b7280', fontWeight: 700 }}>W</span>{' '}
-            <span style={{ color: debugStats.keys.a ? '#34d399' : '#6b7280', fontWeight: 700 }}>A</span>{' '}
-            <span style={{ color: debugStats.keys.s ? '#34d399' : '#6b7280', fontWeight: 700 }}>S</span>{' '}
-            <span style={{ color: debugStats.keys.d ? '#34d399' : '#6b7280', fontWeight: 700 }}>D</span> |{' '}
-            <span style={{ color: debugStats.keys.lmb ? '#f59e0b' : '#6b7280', fontWeight: 700 }}>LMB</span>{' '}
-            <span style={{ color: debugStats.isDashing ? '#a855f7' : '#6b7280', fontWeight: 700 }}>DASH</span>
-          </div>
-          <div>Target: <span style={{ color: debugStats.target ? '#f59e0b' : '#9ca3af', fontWeight: 700 }}>{debugStats.target || 'NONE'}</span></div>
-          <div>Enemies: <span style={{ color: '#38bdf8', fontWeight: 700 }}>{debugStats.livingCount} Active Living</span></div>
-          <div>Flow: <span style={{ color: '#38bdf8', fontWeight: 700 }}>{gameFlowState}</span> (Room {dungeon.currentRoom})</div>
-          <div>Draw Calls: <span style={{ color: '#f3f4f6' }}>{debugStats.drawCalls}</span> | Tris: <span style={{ color: '#f3f4f6' }}>{debugStats.triangles.toLocaleString()}</span></div>
-          <div>Textures: <span style={{ color: '#f3f4f6' }}>{debugStats.textures}</span> {debugStats.memMB && <span>| Mem: {debugStats.memMB}MB</span>}</div>
-          <div>Preset: <span style={{ color: '#c084fc', textTransform: 'uppercase', fontWeight: 700 }}>{graphicsQuality}</span></div>
+
+          {!debugCollapsed && (
+            <>
+              <div>ROOM: <span style={{ color: '#f3f4f6', fontWeight: 800 }}>ROOM {dungeon.currentRoom}</span></div>
+              <div>CAMERA: <span style={{ color: Number.isFinite(debugStats.camPos[0]) ? '#f3f4f6' : '#ef4444' }}>X: {debugStats.camPos[0]?.toFixed(2)} Y: {debugStats.camPos[1]?.toFixed(2)} Z: {debugStats.camPos[2]?.toFixed(2)}</span></div>
+              <div>PLAYER: <span style={{ color: Number.isFinite(debugStats.playerPos[0]) ? '#f3f4f6' : '#ef4444' }}>X: {debugStats.playerPos[0]?.toFixed(2)} Y: {debugStats.playerPos[1]?.toFixed(2)} Z: {debugStats.playerPos[2]?.toFixed(2)}</span></div>
+              <div>SHADOW: <span style={{ color: '#c084fc', fontWeight: 700 }}>{primaryShadow?.active ? `${shadowStatus} (HP: ${shadowHp}/${shadowMaxHp})` : 'UNSUMMONED'}</span></div>
+              <div>FPS: <span style={{ color: debugStats.fps >= 55 ? '#34d399' : debugStats.fps >= 30 ? '#fbbf24' : '#f87171', fontWeight: 800 }}>{debugStats.fps}</span> <span style={{ color: '#9ca3af' }}>({debugStats.frameTime} ms)</span></div>
+              <div>Draw Calls: <span style={{ color: '#f3f4f6' }}>{debugStats.drawCalls}</span> | Tris: <span style={{ color: '#f3f4f6' }}>{debugStats.triangles?.toLocaleString()}</span></div>
+              <div>Textures: <span style={{ color: '#f3f4f6' }}>{debugStats.textures}</span> | Geo: <span style={{ color: '#f3f4f6' }}>{debugStats.geometries}</span></div>
+              <div style={{ marginTop: 6, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <button
+                  onClick={() => {
+                    if (window.__recover3D) window.__recover3D();
+                  }}
+                  style={{
+                    background: '#1e293b',
+                    color: '#38bdf8',
+                    border: '1px solid #38bdf8',
+                    borderRadius: 4,
+                    padding: '3px 8px',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚡ RECOVER 3D
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -494,163 +680,597 @@ export const HUD = () => {
         )}
       </div>
 
-      {/* --- TOP-LEFT: INTERACTIVE CONTROLLER STATUS & MANUAL TEST PANEL --- */}
+      {/* --- LEFT SIDE: CONTROLLER & SHADOW COMMAND PANELS STACK (Requirement 22) --- */}
       <div
-        className="glass-panel"
         style={{
           position: 'absolute',
-          top: 240,
+          top: 236,
           left: 20,
-          padding: '12px 14px',
-          width: 280,
-          pointerEvents: 'auto',
-          borderLeft: '3px solid #38bdf8',
-          background: 'rgba(10, 12, 22, 0.94)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.85)',
-          zIndex: 35
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          pointerEvents: 'none',
+          zIndex: 35,
+          width: 295
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, borderBottom: '1px solid rgba(56, 189, 248, 0.25)', paddingBottom: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
-            CONTROLLER STATUS & TEST
+        {/* --- PANEL 1: CONTROLLER STATUS & TEST --- */}
+        <div
+          className="glass-panel"
+          style={{
+            padding: '10px 14px',
+            width: '100%',
+            pointerEvents: 'auto',
+            borderLeft: '3px solid #38bdf8',
+            background: 'rgba(10, 12, 22, 0.94)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.85)',
+            borderRadius: 6
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: controllerState.collapsed ? 0 : 8, borderBottom: controllerState.collapsed ? 'none' : '1px solid rgba(56, 189, 248, 0.25)', paddingBottom: controllerState.collapsed ? 0 : 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
+              CONTROLLER STATUS & TEST
+            </div>
+            <button
+              onClick={() => setControllerState((s) => ({ ...s, collapsed: !s.collapsed }))}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontWeight: 800
+              }}
+              title={controllerState.collapsed ? 'Expand Controller Panel' : 'Collapse Controller Panel'}
+            >
+              {controllerState.collapsed ? '[ + ]' : '[ - ]'}
+            </button>
           </div>
-          <button
-            onClick={() => setControllerState((s) => ({ ...s, collapsed: !s.collapsed }))}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontWeight: 800
-            }}
-          >
-            {controllerState.collapsed ? '[ + ]' : '[ - ]'}
-          </button>
+
+          {!controllerState.collapsed && (
+            <div>
+              {/* WASD Real-Time Physical Key Indicators */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 28,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    fontFamily: 'monospace',
+                    background: controllerState.w ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
+                    color: controllerState.w ? '#022c22' : '#94a3b8',
+                    border: `1px solid ${controllerState.w ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
+                    boxShadow: controllerState.w ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
+                    transition: 'all 0.08s ease-out'
+                  }}
+                >
+                  W
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['A', 'S', 'D'].map((key) => {
+                    const active =
+                      key === 'A' ? controllerState.a :
+                      key === 'S' ? controllerState.s : controllerState.d;
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          width: 38,
+                          height: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          fontFamily: 'monospace',
+                          background: active ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
+                          color: active ? '#022c22' : '#94a3b8',
+                          border: `1px solid ${active ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
+                          boxShadow: active ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
+                          transition: 'all 0.08s ease-out'
+                        }}
+                      >
+                        {key}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Coordinates & Velocity */}
+              <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 8, lineHeight: 1.45, background: 'rgba(0,0,0,0.4)', padding: '5px 8px', borderRadius: 4 }}>
+                <div>Pos: <span style={{ color: '#f8fafc', fontWeight: 700 }}>[{controllerState.pos.join(', ')}]</span></div>
+                <div>Vel: <span style={{ color: '#38bdf8', fontWeight: 700 }}>[{controllerState.vel.join(', ')}]</span> ({controllerState.speed} m/s)</div>
+              </div>
+
+              {/* Manual Movement Test Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button
+                  className="btn-rpg"
+                  onMouseDown={() => inputManager?.setKey('forward', true)}
+                  onMouseUp={() => inputManager?.setKey('forward', false)}
+                  onClick={() => window.__moveForward?.(450)}
+                  style={{ padding: '5px 8px', fontSize: 11, width: '100%', fontWeight: 700, borderColor: '#38bdf8', cursor: 'pointer' }}
+                >
+                  [ ▲ MOVE FORWARD ]
+                </button>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    className="btn-rpg"
+                    onMouseDown={() => inputManager?.setKey('left', true)}
+                    onMouseUp={() => inputManager?.setKey('left', false)}
+                    onClick={() => window.__moveLeft?.(450)}
+                    style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    [ ◄ LEFT ]
+                  </button>
+                  <button
+                    className="btn-rpg"
+                    onMouseDown={() => inputManager?.setKey('backward', true)}
+                    onMouseUp={() => inputManager?.setKey('backward', false)}
+                    onClick={() => window.__moveBackward?.(450)}
+                    style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    [ ▼ BACK ]
+                  </button>
+                  <button
+                    className="btn-rpg"
+                    onMouseDown={() => inputManager?.setKey('right', true)}
+                    onMouseUp={() => inputManager?.setKey('right', false)}
+                    onClick={() => window.__moveRight?.(450)}
+                    style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    [ ► RIGHT ]
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+                  <button
+                    className="btn-rpg"
+                    onClick={() => window.__resetPlayer?.()}
+                    style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#f59e0b', color: '#fbbf24', cursor: 'pointer' }}
+                  >
+                    [ ↺ RESET PLAYER ]
+                  </button>
+                  <button
+                    className="btn-rpg"
+                    onClick={() => window.__resetCamera?.()}
+                    style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#c084fc', color: '#e879f9', cursor: 'pointer' }}
+                  >
+                    [ 🎥 RESET CAM ]
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {!controllerState.collapsed && (
-          <div>
-            {/* WASD Real-Time Physical Key Indicators */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-              <div
-                style={{
-                  width: 38,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontWeight: 900,
-                  fontFamily: 'monospace',
-                  background: controllerState.w ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
-                  color: controllerState.w ? '#022c22' : '#94a3b8',
-                  border: `1px solid ${controllerState.w ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
-                  boxShadow: controllerState.w ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
-                  transition: 'all 0.08s ease-out'
-                }}
-              >
-                W
+        {/* --- PANEL 2: ◆ SHADOW COMMAND (Requirements 1-22) --- */}
+        <div
+          className="glass-panel"
+          style={{
+            padding: isShadowCmdCollapsed ? '8px 14px' : '12px 14px',
+            width: '100%',
+            pointerEvents: 'auto',
+            borderLeft: '3px solid #38bdf8',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            background: 'rgba(8, 10, 20, 0.95)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.85), inset 0 0 15px rgba(56, 189, 248, 0.08)',
+            borderRadius: 6
+          }}
+        >
+          {/* Header Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isShadowCmdCollapsed ? 0 : 8, borderBottom: isShadowCmdCollapsed ? 'none' : '1px solid rgba(56, 189, 248, 0.25)', paddingBottom: isShadowCmdCollapsed ? 0 : 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 10px #38bdf8' }} />
+              <span style={{ fontFamily: 'var(--font-cinzel)', fontWeight: 900, fontSize: 13, color: '#f3f4f6', letterSpacing: '1.4px' }}>
+                ◆ SHADOW COMMAND
+              </span>
+            </div>
+            <button
+              onClick={toggleShadowCmdCollapsed}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontWeight: 800,
+                padding: '2px 4px'
+              }}
+              title={isShadowCmdCollapsed ? 'Expand Shadow Command Panel' : 'Collapse Shadow Command Panel'}
+            >
+              {isShadowCmdCollapsed ? '[ + ]' : '[ - ]'}
+            </button>
+          </div>
+
+          {!isShadowCmdCollapsed && (
+            <div>
+              {/* Owner & Soldier Level (Requirement 20) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, fontSize: 10 }}>
+                <div style={{ fontWeight: 800, color: '#38bdf8', letterSpacing: '0.8px' }}>
+                  OWNER: <span style={{ color: '#f3f4f6', fontWeight: 900 }}>{player.name?.toUpperCase() || 'AWAKENED HUNTER'}</span>
+                </div>
+                <div style={{ color: '#c084fc', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  LVL {primaryShadow?.level || 1}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['A', 'S', 'D'].map((key) => {
-                  const active =
-                    key === 'A' ? controllerState.a :
-                    key === 'S' ? controllerState.s : controllerState.d;
+
+              {/* Secondary Status & Soldier Name */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, fontSize: 10 }}>
+                <div style={{ fontWeight: 800, color: '#94a3b8', letterSpacing: '0.8px' }}>
+                  SHADOW:{' '}
+                  <span
+                    style={{
+                      fontWeight: 900,
+                      color: isShadowDead ? '#ef4444' : isShadowSummoned ? '#38bdf8' : isShadowAvailable ? '#a78bfa' : '#6b7280'
+                    }}
+                  >
+                    {isShadowDead ? 'DEFEATED' : isShadowSummoned ? 'SUMMONED' : isShadowAvailable ? 'AVAILABLE' : 'NOT ACQUIRED'}
+                  </span>
+                </div>
+                <div style={{ color: '#94a3b8', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  {primaryShadow?.name?.toUpperCase() || 'DUSK KNIGHT'}
+                </div>
+              </div>
+
+              {/* SHADOW HP Bar (Requirement 9 & 10) */}
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#38bdf8', marginBottom: 2 }}>
+                  <span style={{ letterSpacing: '0.5px' }}>SHADOW HP</span>
+                  <span style={{ fontFamily: 'monospace' }}>{shadowHp} / {shadowMaxHp}</span>
+                </div>
+                <div style={{ width: '100%', height: 9, background: 'rgba(0, 0, 0, 0.75)', borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                  <div
+                    style={{
+                      width: `${shadowHpPercent}%`,
+                      height: '100%',
+                      background: isShadowDead
+                        ? '#4b5563'
+                        : shadowHp <= shadowMaxHp * 0.25
+                        ? 'linear-gradient(90deg, #c2410c, #f97316)'
+                        : 'linear-gradient(90deg, #0284c7, #38bdf8)',
+                      transition: 'width 0.2s ease-out',
+                      boxShadow: shadowHpPercent > 0 ? '0 0 8px rgba(56, 189, 248, 0.5)' : 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* SHADOW MP Bar (Requirement 9 & 10) */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#c084fc', marginBottom: 2 }}>
+                  <span style={{ letterSpacing: '0.5px' }}>SHADOW MP</span>
+                  <span style={{ fontFamily: 'monospace' }}>{shadowMp} / {shadowMaxMp}</span>
+                </div>
+                <div style={{ width: '100%', height: 7, background: 'rgba(0, 0, 0, 0.75)', borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(168, 85, 247, 0.4)' }}>
+                  <div
+                    style={{
+                      width: `${shadowMpPercent}%`,
+                      height: '100%',
+                      background: isShadowDead ? '#374151' : 'linear-gradient(90deg, #6b21a8, #c084fc)',
+                      transition: 'width 0.2s ease-out',
+                      boxShadow: shadowMpPercent > 0 ? '0 0 8px rgba(168, 85, 247, 0.5)' : 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Real-Time Target & Status Cards (Requirement 8 & 11) */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8, fontSize: 10.5 }}>
+                <div style={{ flex: 1, background: 'rgba(0, 0, 0, 0.45)', padding: '5px 7px', borderRadius: 4, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ color: '#9ca3af', fontSize: 9, fontWeight: 700, letterSpacing: '0.6px' }}>TARGET:</div>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      marginTop: 2,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: shadowTargetName !== 'NONE' ? '#38bdf8' : '#6b7280'
+                    }}
+                  >
+                    {shadowTargetName}
+                  </div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(0, 0, 0, 0.45)', padding: '5px 7px', borderRadius: 4, border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ color: '#9ca3af', fontSize: 9, fontWeight: 700, letterSpacing: '0.6px' }}>STATUS:</div>
+                  <div
+                    style={{
+                      fontWeight: 900,
+                      marginTop: 2,
+                      letterSpacing: '0.6px',
+                      color: getShadowStatusColor(shadowStatus)
+                    }}
+                  >
+                    {shadowStatus}
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ borderTop: '1px solid rgba(56, 189, 248, 0.2)', margin: '8px 0 6px 0' }} />
+
+              {/* Primary Keycap Command Buttons (Z, X, C) (Requirements 3-6, 12-14) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
+                {/* Z Button */}
+                {(() => {
+                  const isZDisabled = !isShadowAvailable || (isShadowDead && player.mana < 60) || (!isShadowSummoned && player.mana < 50);
+                  const zTitle = isShadowSummoned
+                    ? 'COMMAND SHADOW'
+                    : isShadowDead
+                    ? 'RESUMMON SHADOW'
+                    : !isShadowAvailable
+                    ? 'SUMMON SHADOW'
+                    : 'SUMMON SHADOW';
+                  const zSubtitle = !isShadowAvailable
+                    ? 'SHADOW NOT ACQUIRED'
+                    : isShadowDead
+                    ? player.mana < 60 ? `NOT ENOUGH MP (REQ: 60 MP)` : '60 PLAYER MP REQUIRED'
+                    : !isShadowSummoned
+                    ? player.mana < 50 ? `NOT ENOUGH MP (REQ: 50 MP)` : '50 PLAYER MP REQUIRED'
+                    : 'ATTACK CURRENT TARGET';
+
                   return (
-                    <div
-                      key={key}
+                    <button
+                      className="btn-rpg"
+                      onClick={() => {
+                        triggerKeyFeedback('z');
+                        useGameStore.getState().summonOrCommandShadow();
+                      }}
                       style={{
-                        width: 38,
-                        height: 28,
+                        padding: '5px 8px',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 4,
-                        fontSize: 12,
-                        fontWeight: 900,
-                        fontFamily: 'monospace',
-                        background: active ? '#10b981' : 'rgba(30, 41, 59, 0.8)',
-                        color: active ? '#022c22' : '#94a3b8',
-                        border: `1px solid ${active ? '#34d399' : 'rgba(71, 85, 105, 0.6)'}`,
-                        boxShadow: active ? '0 0 12px rgba(16, 185, 129, 0.8)' : 'none',
-                        transition: 'all 0.08s ease-out'
+                        gap: 8,
+                        width: '100%',
+                        cursor: isZDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: isShadowSummoned ? '#38bdf8' : isShadowDead ? '#ef4444' : isShadowAvailable ? '#a855f7' : '#4b5563',
+                        background: activeKeycaps.z
+                          ? 'rgba(56, 189, 248, 0.35)'
+                          : isShadowSummoned
+                          ? 'rgba(14, 165, 233, 0.15)'
+                          : 'rgba(20, 24, 38, 0.65)',
+                        opacity: !isShadowAvailable ? 0.6 : 1
                       }}
+                      title={zTitle}
                     >
-                      {key}
+                      {/* Keycap visual element */}
+                      <div
+                        style={{
+                          width: 30,
+                          height: 24,
+                          minWidth: 30,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          fontFamily: 'monospace',
+                          background: activeKeycaps.z ? '#38bdf8' : 'rgba(30, 41, 59, 0.85)',
+                          color: activeKeycaps.z ? '#021827' : '#e0f2fe',
+                          border: `1px solid ${activeKeycaps.z ? '#7dd3fc' : 'rgba(71, 85, 105, 0.65)'}`,
+                          boxShadow: activeKeycaps.z ? '0 0 12px rgba(56, 189, 248, 0.9)' : 'none',
+                          transform: activeKeycaps.z ? 'scale(1.08)' : 'scale(1)',
+                          transition: 'all 0.08s ease-out'
+                        }}
+                      >
+                        Z
+                      </div>
+                      <div style={{ textAlign: 'left', overflow: 'hidden' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.4px' }}>
+                          {zTitle}
+                        </div>
+                        <div style={{ fontSize: 9, color: isZDisabled ? '#ef4444' : '#94a3b8' }}>
+                          {zSubtitle}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })()}
+
+                {/* X Button */}
+                <button
+                  className="btn-rpg"
+                  onClick={() => {
+                    triggerKeyFeedback('x');
+                    const living = getAllLivingEnemies();
+                    useGameStore.getState().cycleTargetLock(living);
+                  }}
+                  style={{
+                    padding: '5px 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    cursor: 'pointer',
+                    borderColor: '#a855f7',
+                    background: activeKeycaps.x ? 'rgba(168, 85, 247, 0.35)' : 'rgba(168, 85, 247, 0.12)'
+                  }}
+                  title="Target enemy (X or TAB)"
+                >
+                  <div
+                    style={{
+                      width: 30,
+                      height: 24,
+                      minWidth: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fontFamily: 'monospace',
+                      background: activeKeycaps.x ? '#c084fc' : 'rgba(30, 41, 59, 0.85)',
+                      color: activeKeycaps.x ? '#021827' : '#f5d0fe',
+                      border: `1px solid ${activeKeycaps.x ? '#e879f9' : 'rgba(71, 85, 105, 0.65)'}`,
+                      boxShadow: activeKeycaps.x ? '0 0 12px rgba(192, 132, 252, 0.9)' : 'none',
+                      transform: activeKeycaps.x ? 'scale(1.08)' : 'scale(1)',
+                      transition: 'all 0.08s ease-out'
+                    }}
+                  >
+                    X
+                  </div>
+                  <div style={{ textAlign: 'left', overflow: 'hidden' }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.4px' }}>
+                      TARGET ENEMY
                     </div>
+                    <div style={{ fontSize: 9, color: lockedTargetId ? '#38bdf8' : '#94a3b8' }}>
+                      {lockedTargetId ? `TARGET: ${lockedTargetEnemyName}` : 'CYCLE / ACQUIRE NEAREST'}
+                    </div>
+                  </div>
+                </button>
+
+                {/* C Button */}
+                <button
+                  className="btn-rpg"
+                  onClick={() => {
+                    triggerKeyFeedback('c');
+                    useGameStore.getState().recallShadow();
+                  }}
+                  style={{
+                    padding: '5px 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    cursor: 'pointer',
+                    borderColor: '#818cf8',
+                    background: activeKeycaps.c ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.12)'
+                  }}
+                  title="Recall Shadow to player (C)"
+                >
+                  <div
+                    style={{
+                      width: 30,
+                      height: 24,
+                      minWidth: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fontFamily: 'monospace',
+                      background: activeKeycaps.c ? '#818cf8' : 'rgba(30, 41, 59, 0.85)',
+                      color: activeKeycaps.c ? '#021827' : '#e0e7ff',
+                      border: `1px solid ${activeKeycaps.c ? '#a5b4fc' : 'rgba(71, 85, 105, 0.65)'}`,
+                      boxShadow: activeKeycaps.c ? '0 0 12px rgba(129, 140, 248, 0.9)' : 'none',
+                      transform: activeKeycaps.c ? 'scale(1.08)' : 'scale(1)',
+                      transition: 'all 0.08s ease-out'
+                    }}
+                  >
+                    C
+                  </div>
+                  <div style={{ textAlign: 'left', overflow: 'hidden' }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.4px' }}>
+                      RECALL SHADOW
+                    </div>
+                    <div style={{ fontSize: 9, color: shadowStatus === 'RECALLING' ? '#818cf8' : '#94a3b8' }}>
+                      {shadowStatus === 'RECALLING' ? 'RETURNING TO FORMATION...' : 'RETURN TO FORMATION'}
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Shadow Abilities Header */}
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.8px', marginBottom: 5 }}>
+                SHADOW ABILITIES (SHADOW MP):
+              </div>
+
+              {/* Abilities 4-Across Grid with Keycaps (Requirement 3, 7, 13, 14) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                {[
+                  { slot: 1, name: 'SHADOW SLASH', short: 'SLASH', mp: 30, key: '1' },
+                  { slot: 2, name: 'SHADOW GUARD', short: 'GUARD', mp: 50, key: '2' },
+                  { slot: 3, name: 'SHADOW STEP', short: 'STEP', mp: 40, key: '3' },
+                  { slot: 4, name: 'DARK STRIKE', short: 'STRIKE', mp: 80, key: '4' }
+                ].map((ab) => {
+                  const cdExpires = shadowCooldowns[ab.slot] || 0;
+                  const cdRemaining = Math.max(0, cdExpires - now);
+                  const isOnCd = cdRemaining > 0;
+                  const hasMp = shadowMp >= ab.mp;
+                  const isKeyActive = Boolean(activeKeycaps[ab.key]);
+                  const isDisabled = !isShadowSummoned || isOnCd || !hasMp;
+
+                  return (
+                    <button
+                      key={ab.slot}
+                      className="btn-rpg"
+                      onClick={() => {
+                        triggerKeyFeedback(ab.key);
+                        useGameStore.getState().useShadowAbility(ab.slot);
+                      }}
+                      style={{
+                        padding: '5px 3px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: isOnCd ? '#f59e0b' : !hasMp ? '#ef4444' : '#38bdf8',
+                        background: isKeyActive
+                          ? 'rgba(56, 189, 248, 0.35)'
+                          : isOnCd
+                          ? 'rgba(245, 158, 11, 0.08)'
+                          : !hasMp
+                          ? 'rgba(239, 68, 68, 0.08)'
+                          : 'rgba(30, 41, 59, 0.65)',
+                        opacity: !isShadowSummoned ? 0.5 : 1,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        minHeight: 52
+                      }}
+                      title={`${ab.name} (${ab.mp} Shadow MP)`}
+                    >
+                      {/* Keycap */}
+                      <div
+                        style={{
+                          width: 24,
+                          height: 20,
+                          minWidth: 24,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 3,
+                          fontSize: 11,
+                          fontWeight: 900,
+                          fontFamily: 'monospace',
+                          background: isKeyActive ? '#38bdf8' : 'rgba(20, 24, 38, 0.9)',
+                          color: isKeyActive ? '#021827' : '#38bdf8',
+                          border: `1px solid ${isKeyActive ? '#7dd3fc' : 'rgba(56, 189, 248, 0.5)'}`,
+                          boxShadow: isKeyActive ? '0 0 10px rgba(56, 189, 248, 0.9)' : 'none',
+                          transform: isKeyActive ? 'scale(1.1)' : 'scale(1)',
+                          transition: 'all 0.08s ease-out'
+                        }}
+                      >
+                        {ab.key}
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ textAlign: 'center', lineHeight: 1.15, width: '100%' }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ab.short}
+                        </div>
+                        <div style={{ fontSize: 8, fontWeight: 700, color: isOnCd ? '#fbbf24' : !hasMp ? '#f87171' : '#38bdf8', marginTop: 1 }}>
+                          {isOnCd ? `CD ${cdRemaining.toFixed(1)}s` : !hasMp ? 'NO MP' : `${ab.mp} MP`}
+                        </div>
+                      </div>
+                    </button>
                   );
                 })}
               </div>
             </div>
-
-            {/* Coordinates & Velocity */}
-            <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 8, lineHeight: 1.45, background: 'rgba(0,0,0,0.4)', padding: '5px 8px', borderRadius: 4 }}>
-              <div>Pos: <span style={{ color: '#f8fafc', fontWeight: 700 }}>[{controllerState.pos.join(', ')}]</span></div>
-              <div>Vel: <span style={{ color: '#38bdf8', fontWeight: 700 }}>[{controllerState.vel.join(', ')}]</span> ({controllerState.speed} m/s)</div>
-            </div>
-
-            {/* Manual Movement Test Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <button
-                className="btn-rpg"
-                onMouseDown={() => inputManager?.setKey('forward', true)}
-                onMouseUp={() => inputManager?.setKey('forward', false)}
-                onClick={() => window.__moveForward?.(450)}
-                style={{ padding: '5px 8px', fontSize: 11, width: '100%', fontWeight: 700, borderColor: '#38bdf8', cursor: 'pointer' }}
-              >
-                [ ▲ MOVE FORWARD ]
-              </button>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  className="btn-rpg"
-                  onMouseDown={() => inputManager?.setKey('left', true)}
-                  onMouseUp={() => inputManager?.setKey('left', false)}
-                  onClick={() => window.__moveLeft?.(450)}
-                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  [ ◄ LEFT ]
-                </button>
-                <button
-                  className="btn-rpg"
-                  onMouseDown={() => inputManager?.setKey('backward', true)}
-                  onMouseUp={() => inputManager?.setKey('backward', false)}
-                  onClick={() => window.__moveBackward?.(450)}
-                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  [ ▼ BACK ]
-                </button>
-                <button
-                  className="btn-rpg"
-                  onMouseDown={() => inputManager?.setKey('right', true)}
-                  onMouseUp={() => inputManager?.setKey('right', false)}
-                  onClick={() => window.__moveRight?.(450)}
-                  style={{ flex: 1, padding: '5px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  [ ► RIGHT ]
-                </button>
-              </div>
-              <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-                <button
-                  className="btn-rpg"
-                  onClick={() => window.__resetPlayer?.()}
-                  style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#f59e0b', color: '#fbbf24', cursor: 'pointer' }}
-                >
-                  [ ↺ RESET PLAYER ]
-                </button>
-                <button
-                  className="btn-rpg"
-                  onClick={() => window.__resetCamera?.()}
-                  style={{ flex: 1, padding: '4px 3px', fontSize: 10, borderColor: '#c084fc', color: '#e879f9', cursor: 'pointer' }}
-                >
-                  [ 🎥 RESET CAM ]
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* --- TOP-CENTER: EXPLORATION STATUS BANNER --- */}
@@ -708,10 +1328,10 @@ export const HUD = () => {
         </div>
       )}
 
-      {/* DEVELOPER DEBUG HUD DISPLAY: Requirement 12 */}
-      {dungeon.currentRoom === 1 && (
+      {/* DEVELOPER DEBUG HUD DISPLAY: Dynamic for any room (Requirement 17) */}
+      {dungeon.currentRoom && (
         <div
-          id="developer-room1-enemies-hud"
+          id="developer-room-enemies-hud"
           style={{
             position: 'absolute',
             top: activeEncounter ? 80 : 16,
@@ -735,7 +1355,7 @@ export const HUD = () => {
         >
           <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8' }} />
           <span>
-            {`ROOM 1 ENEMIES: 10 | ALIVE: ${dungeon.roomEnemiesRemaining ?? 10} | DEAD: ${Math.max(0, 10 - (dungeon.roomEnemiesRemaining ?? 10))}`}
+            {`ROOM ${dungeon.currentRoom} ENEMIES: ${dungeon.roomEnemiesTotal ?? 10} | ALIVE: ${dungeon.roomEnemiesRemaining ?? 10} | DEAD: ${Math.max(0, (dungeon.roomEnemiesTotal ?? 10) - (dungeon.roomEnemiesRemaining ?? 10))}`}
           </span>
         </div>
       )}
@@ -944,11 +1564,11 @@ export const HUD = () => {
               {activeQuest.title}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-              {activeQuest.objectives.map((obj) => (
-                <div key={obj.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: obj.current >= obj.target ? '#4ade80' : '#d1d5db' }}>
+              {Array.isArray(activeQuest.objectives) && activeQuest.objectives.map((obj) => (
+                <div key={obj.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: (obj.current || 0) >= (obj.target || 1) ? '#4ade80' : '#d1d5db' }}>
                   <span>{obj.text}</span>
                   <span style={{ fontWeight: 700 }}>
-                    {obj.current} / {obj.target}
+                    {obj.current || 0} / {obj.target || 1}
                   </span>
                 </div>
               ))}
@@ -956,7 +1576,7 @@ export const HUD = () => {
             <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af' }}>
               <span>Reward:</span>
               <span style={{ color: '#fbbf24', fontWeight: 600 }}>
-                +{activeQuest.rewards.xp} XP / +{activeQuest.rewards.gold} Gold
+                +{activeQuest.rewards?.xp || 150} XP / +{activeQuest.rewards?.gold || 50} Gold
               </span>
             </div>
           </div>
@@ -1048,8 +1668,8 @@ export const HUD = () => {
           }}
         >
           <span style={{ fontSize: 14 }}>◎</span>
-          <span>TARGET LOCKED</span>
-          <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>[TAB to cycle/unlock]</span>
+          <span>TARGET: {lockedTargetEnemyName}</span>
+          <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>[X / TAB to cycle]</span>
         </div>
       )}
 
