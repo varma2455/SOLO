@@ -2,21 +2,51 @@ import { sound } from '../../audio/soundManager';
 import { useGameStore } from '../../store/gameStore';
 import { safeVector3 } from '../../utils/vector3';
 
-export const calculatePlayerDamage = (skillMultiplier = 1.0) => {
+export const calculatePlayerDamage = (skillMultiplier = 1.0, attackType = null) => {
   const store = useGameStore.getState();
   const player = store.player;
 
-  const baseAtk = player?.attack || 25;
+  // Exact damage values as specified:
+  // LMB combo = 80 / 100 / 140 damage
+  // Q Shadow Slash = 220 damage
+  // E Phantom Dash = movement/evade, small damage (~50)
+  // R Ultimate = 800 damage
+  let baseDamage = 80;
+  if (attackType === 'combo1' || attackType === 1) {
+    baseDamage = 80;
+  } else if (attackType === 'combo2' || attackType === 2) {
+    baseDamage = 100;
+  } else if (attackType === 'combo3' || attackType === 3) {
+    baseDamage = 140;
+  } else if (attackType === 'shadowSlash' || attackType === 'skill_q') {
+    baseDamage = 220;
+  } else if (attackType === 'phantomStep' || attackType === 'dash' || attackType === 'skill_e') {
+    baseDamage = 50;
+  } else if (attackType === 'eclipseDominion' || attackType === 'ultimate' || attackType === 'skill_r') {
+    baseDamage = 800;
+  } else if (typeof attackType === 'number') {
+    baseDamage = attackType;
+  } else {
+    // If multiplier only is passed, map to exact values
+    if (skillMultiplier === 1.0) baseDamage = 80;
+    else if (skillMultiplier === 1.2) baseDamage = 100;
+    else if (skillMultiplier === 1.8) baseDamage = 140;
+    else if (skillMultiplier === 2.2) baseDamage = 220;
+    else if (skillMultiplier === 8.0) baseDamage = 800;
+    else baseDamage = Math.round(80 * skillMultiplier);
+  }
+
   const critRoll = Math.random() * 100;
   const isCrit = critRoll <= (player?.critChance || 10);
   const critModifier = isCrit ? (player?.critDamage || 150) / 100 : 1.0;
 
-  // Add small random variation (+- 10%)
-  const variance = 0.9 + Math.random() * 0.2;
-  const rawDamage = Math.round(baseAtk * skillMultiplier * critModifier * variance);
+  // Subtle variance for organic feel
+  const variance = 0.98 + Math.random() * 0.04;
+  const rawDamage = Math.round(baseDamage * critModifier * variance);
 
   return {
     damage: Math.max(1, rawDamage),
+    baseDamage,
     isCrit
   };
 };

@@ -120,21 +120,156 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1, se
 
   // -------------------------------------------------------------
   // ROOM 1: THE FORGOTTEN CRYPT (Z: 7 to -26)
-  // Options: SQUAD | SWARM | MIXED
+  // 10-MONSTER ENCOUNTER: 5 Goblins, 2 Shadow Soldiers, 1 Shadow Knight, 1 Abyss Brute, 1 Elite
   // -------------------------------------------------------------
-  const r1Types = [
-    { type: ENCOUNTER_TYPES.SQUAD, weight: 40 },
-    { type: ENCOUNTER_TYPES.SWARM, weight: 35 },
-    { type: ENCOUNTER_TYPES.MIXED, weight: 25 }
+  const r1Bounds = ROOM_BOUNDS[1];
+  const r1Enemies = [
+    // 5 Goblins
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.ashGoblin, baseLevel, rankMult),
+      id: 'room1-goblin-001',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [-3.5, r1Bounds.floorY, 0],
+      patrolRadius: 4.5,
+      room: 1
+    },
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.goblinScout, baseLevel, rankMult),
+      id: 'room1-goblin-002',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [3.5, r1Bounds.floorY, -3],
+      patrolRadius: 5.0,
+      room: 1
+    },
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.goblinWarrior, baseLevel, rankMult),
+      id: 'room1-goblin-003',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [-6.5, r1Bounds.floorY, -7],
+      patrolRadius: 4.0,
+      room: 1
+    },
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.goblinArcher, baseLevel, rankMult),
+      id: 'room1-goblin-004',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [6.5, r1Bounds.floorY, -9],
+      patrolRadius: 4.5,
+      room: 1
+    },
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.ashGoblin, baseLevel, rankMult),
+      id: 'room1-goblin-005',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [0, r1Bounds.floorY, -11],
+      patrolRadius: 4.0,
+      room: 1
+    },
+    // 2 Shadow Soldiers
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.graveSoldier, baseLevel, rankMult),
+      id: 'room1-soldier-001',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [-4.5, r1Bounds.floorY, -15],
+      patrolRadius: 5.0,
+      room: 1
+    },
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.graveSoldier, baseLevel, rankMult),
+      id: 'room1-soldier-002',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [4.5, r1Bounds.floorY, -17],
+      patrolRadius: 5.0,
+      room: 1
+    },
+    // 1 Shadow Knight
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.bloodKnight, baseLevel + 1, rankMult),
+      id: 'room1-knight-001',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [-3.0, r1Bounds.floorY, -20],
+      patrolRadius: 4.0,
+      room: 1
+    },
+    // 1 Abyss Brute
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.goblinBrute, baseLevel + 1, rankMult),
+      id: 'room1-brute-001',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [3.0, r1Bounds.floorY, -21],
+      patrolRadius: 4.0,
+      room: 1
+    },
+    // 1 Elite
+    {
+      ...scaleEnemyStats(ENEMY_TYPES.goblinElite, baseLevel + 2, rankMult * 1.2),
+      id: 'room1-elite-001',
+      roomId: 'room1',
+      state: 'alive',
+      deathProcessed: false,
+      spawnPosition: [0, r1Bounds.floorY, -23],
+      patrolRadius: 3.5,
+      isApex: true,
+      room: 1
+    }
   ];
-  const r1Choice = weightedRandom(prng, r1Types);
 
-  encounters[1] = buildDeterministicRoomEncounter(prng, 1, r1Choice, baseLevel, rankMult, {
-    weakTypes: ['ashGoblin', 'rottingSkeleton', 'caveCrawler', 'shadowRat'],
-    mediumTypes: ['graveSoldier', 'boneReaver'],
-    eliteTypes: ['cryptGuardian'],
-    allowCommander: false
-  });
+  encounters[1] = {
+    id: 'enc_r1_forgotten_crypt',
+    roomIndex: 1,
+    type: ENCOUNTER_TYPES.MIXED,
+    typeName: 'Crypt Vanguard Legion',
+    primaryEnemy: {
+      id: 'room1-elite-001',
+      name: 'Crypt Goblin Overlord',
+      tier: 'elite',
+      tierLabel: 'ELITE WARBAND',
+      starsText: '★★★☆☆',
+      level: baseLevel + 2,
+      description: 'A fortified warband composed of 10 hostile creatures defending the upper crypt.',
+      dangerLabel: 'HIGH',
+      dangerStars: 3,
+      hp: r1Enemies.reduce((acc, e) => acc + e.maxHp, 0),
+      maxHp: r1Enemies.reduce((acc, e) => acc + e.maxHp, 0),
+      enemyCount: 10
+    },
+    dangerRating: { stars: 3, label: 'HIGH', ratingText: '★★★☆☆' },
+    discoveryDistance: 14.0,
+    encounterCenter: [0, r1Bounds.floorY, r1Bounds.centerZ],
+    battleSpawnPlayer: [0, 0.5, 5],
+    battleSpawnMonster: [0, 0, -10],
+    isAmbush: false,
+    isSwarm: false,
+    hasCommander: false,
+    hasElite: true,
+    enemies: r1Enemies,
+    totalEnemies: 10,
+    discovered: false,
+    defeated: false,
+    clues: [
+      'Guttering torchlight illuminates claw-marked flagstones',
+      'The harsh, guttering chatter of a goblin warband echoes ahead',
+      'Discarded shields bearing dark iron insignias litter the path'
+    ]
+  };
 
   // -------------------------------------------------------------
   // ROOM 2: ELITE SANCTUM (Z: -41 to -72)
@@ -178,8 +313,14 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1, se
   // ROOM 4: THRONE OF THE ABYSS WARDEN (Z: -109 to -165)
   // Boss Sovereign
   // -------------------------------------------------------------
-  const bossLevel = baseLevel + 6;
-  const scaledBoss = scaleEnemyStats(ENEMY_TYPES.abyssWarden, bossLevel, rankMult);
+  const bossLevel = 8;
+  const scaledBoss = {
+    ...scaleEnemyStats(ENEMY_TYPES.abyssWarden, bossLevel, 1.0),
+    maxHp: 5000,
+    hp: 5000,
+    level: 8,
+    attack: 45
+  };
 
   encounters[4] = {
     id: 'enc_r4_abyss_warden',
@@ -192,13 +333,13 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1, se
       tier: 'boss',
       tierLabel: 'BOSS',
       starsText: '★★★★★',
-      level: bossLevel,
+      level: 8,
       description: 'The supreme ancient sovereign awakened within the depths of the throne room.',
       dangerLabel: 'LETHAL',
       dangerStars: 5,
-      hp: scaledBoss.maxHp,
-      maxHp: scaledBoss.maxHp,
-      attack: scaledBoss.attack
+      hp: 5000,
+      maxHp: 5000,
+      attack: 45
     },
     dangerRating: { stars: 5, label: 'LETHAL', ratingText: '★★★★★' },
     discoveryDistance: 25.0, // 25 meters detection range for Boss
@@ -214,6 +355,9 @@ export function generateDungeonEncounters(dungeonRank = 'E', playerLevel = 1, se
       {
         ...scaledBoss,
         id: 'abyssWarden',
+        roomId: 'room4',
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: [0, 0, -138],
         room: 4
       }
@@ -291,7 +435,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_swarm_${idx}_${typeKey}`,
+        id: `room${roomIndex}-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         room: roomIndex
       };
@@ -328,7 +475,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
 
     const eliteEnemy = {
       ...scaledElite,
-      id: `enc_r${roomIndex}_elite_${eliteKey}`,
+      id: `room${roomIndex}-${eliteKey}-001`,
+      roomId: `room${roomIndex}`,
+      state: 'alive',
+      deathProcessed: false,
       name: scaledElite.name,
       scale: (scaledElite.scale || 1.4) * 1.15,
       maxHp: Math.round(scaledElite.maxHp * 1.4),
@@ -372,11 +522,14 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
 
     const cmdKey = randFrom(pools.commanderTypes || ['graveWarlord']);
     const scaledCmd = scaleEnemyStats(ENEMY_TYPES[cmdKey], level + 3, rankMult);
-    const cmdId = `enc_r${roomIndex}_commander_${cmdKey}`;
+    const cmdId = `room${roomIndex}-commander-${cmdKey}-001`;
 
     const commanderEnemy = {
       ...scaledCmd,
       id: cmdId,
+      roomId: `room${roomIndex}`,
+      state: 'alive',
+      deathProcessed: false,
       spawnPosition: [0, bounds.floorY, centerZ - 2],
       isCommander: true,
       room: roomIndex
@@ -389,7 +542,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_cmd_minion_${idx}`,
+        id: `room${roomIndex}-minion-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         commanderId: cmdId,
         room: roomIndex
@@ -435,7 +591,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level + 1, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_ambush_${idx}`,
+        id: `room${roomIndex}-ambush-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         isAmbushSpawn: true,
         room: roomIndex
@@ -473,7 +632,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
     const scaledElite = scaleEnemyStats(ENEMY_TYPES[eliteKey], level + 2, rankMult);
     const eliteEnemy = {
       ...scaledElite,
-      id: `enc_r${roomIndex}_phalanx_elite`,
+      id: `room${roomIndex}-elite-${eliteKey}-001`,
+      roomId: `room${roomIndex}`,
+      state: 'alive',
+      deathProcessed: false,
       spawnPosition: [0, bounds.floorY, centerZ],
       room: roomIndex
     };
@@ -485,7 +647,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level + 1, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_phalanx_guard_${idx}`,
+        id: `room${roomIndex}-guard-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         room: roomIndex
       };
@@ -498,7 +663,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_phalanx_weak_${idx}`,
+        id: `room${roomIndex}-weak-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         room: roomIndex
       };
@@ -542,7 +710,10 @@ function buildDeterministicRoomEncounter(prng, roomIndex, encounterType, level, 
       const scaled = scaleEnemyStats(ENEMY_TYPES[typeKey], level, rankMult);
       return {
         ...scaled,
-        id: `enc_r${roomIndex}_squad_${idx}`,
+        id: `room${roomIndex}-${typeKey}-${String(idx + 1).padStart(3, '0')}`,
+        roomId: `room${roomIndex}`,
+        state: 'alive',
+        deathProcessed: false,
         spawnPosition: pos,
         room: roomIndex
       };

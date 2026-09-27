@@ -121,3 +121,7 @@ export function getNearestEnemy(playerPos, maxDist = 30) {
 
   return nearest;
 }
+
+if (typeof window !== 'undefined') {
+  window.__getAllLivingEnemies = getAllLivingEnemies;
+}

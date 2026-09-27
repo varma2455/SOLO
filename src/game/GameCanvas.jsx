@@ -225,10 +225,10 @@ export const GameCanvas = () => {
             depth: true
           }}
           onCreated={({ scene }) => {
-            // Visible dark-gray background color (never pure pitch black)
-            scene.background = new THREE.Color('#15131c');
-            // Atmospheric dungeon fog
-            scene.fog = new THREE.Fog('#15131c', 25, 110);
+            // Visible dark fantasy background (never pure pitch black)
+            scene.background = new THREE.Color('#0d0c15');
+            // Atmospheric volumetric-looking dungeon fog
+            scene.fog = new THREE.Fog('#0d0c15', 22, 105);
           }}
         >
           {/* Engine metrics collector for HUD performance overlay */}

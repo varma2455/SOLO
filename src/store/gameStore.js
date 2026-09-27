@@ -222,10 +222,12 @@ export const useGameStore = create((set, get) => ({
     roomsUnlocked: [true, false, false, false],
     fogExplored: [1], // Room indices explored
     bossActive: false,
-    bossHp: 3200,
-    bossMaxHp: 3200,
+    bossHp: 5000,
+    bossMaxHp: 5000,
     bossPhase: 1,
     bossRage: false,
+    level1Completed: false,
+    dungeonCompleted: false,
     monstersDefeated: 0
   },
 
@@ -294,15 +296,17 @@ export const useGameStore = create((set, get) => ({
       currentWave: 1,
       totalWaves: 1,
       dangerRating: { stars: 1, label: 'CALM', ratingText: '★☆☆☆☆' },
-      roomEnemiesRemaining: 0,
-      roomEnemiesTotal: 0,
+      roomEnemiesRemaining: encounters[1]?.enemies?.length || 10,
+      roomEnemiesTotal: encounters[1]?.enemies?.length || 10,
       roomsUnlocked: [true, false, false, false],
       fogExplored: [1],
       bossActive: false,
-      bossHp: encounters[4]?.boss?.maxHp || 3200,
-      bossMaxHp: encounters[4]?.boss?.maxHp || 3200,
+      bossHp: encounters[4]?.boss?.maxHp || 5000,
+      bossMaxHp: encounters[4]?.boss?.maxHp || 5000,
       bossPhase: 1,
       bossRage: false,
+      level1Completed: false,
+      dungeonCompleted: false,
       monstersDefeated: 0
     };
 
@@ -617,10 +621,16 @@ export const useGameStore = create((set, get) => ({
     if (!enc) return;
 
     sound.playLevelUp();
+    if (typeof document !== 'undefined') {
+      try {
+        document.exitPointerLock?.();
+      } catch (_) {}
+    }
 
-    const xpReward = Math.round((enc.primaryEnemy?.level || 1) * 75 * (enc.hasElite ? 2.5 : 1.2));
-    const goldReward = Math.round((enc.primaryEnemy?.level || 1) * 35 * (enc.hasElite ? 2.0 : 1.0));
-    const droppedItem = getRandomLoot(enc.primaryEnemy?.id || 'bloodKnight')[0] || ITEMS_DATABASE[1];
+    const isBoss = enc.id === 'enc_r4_abyss_warden' || enc.primaryEnemy?.id === 'abyssWarden' || enc.isBoss;
+    const xpReward = enc.xpReward != null ? enc.xpReward : (isBoss ? 500 : Math.round((enc.primaryEnemy?.level || 1) * 75 * (enc.hasElite ? 2.5 : 1.2)));
+    const goldReward = enc.goldReward != null ? enc.goldReward : (isBoss ? 150 : Math.round((enc.primaryEnemy?.level || 1) * 35 * (enc.hasElite ? 2.0 : 1.0)));
+    const droppedItem = getRandomLoot(enc.primaryEnemy?.id || (isBoss ? 'abyssWarden' : 'bloodKnight'))[0] || ITEMS_DATABASE[1];
 
     get().gainXp(xpReward);
     get().gainGold(goldReward);
@@ -640,16 +650,21 @@ export const useGameStore = create((set, get) => ({
     set({
       gameFlowState: 'VICTORY',
       victoryData: {
-        encounterName: enc.primaryEnemy?.name || enc.typeName,
+        encounterName: enc.primaryEnemy?.name || enc.typeName || 'Abyss Warden',
         xp: xpReward,
         gold: goldReward,
-        item: droppedItem
+        item: droppedItem,
+        isBoss,
+        level1Complete: isBoss || get().dungeon.level1Completed
       },
       dungeon: {
         ...get().dungeon,
         encountersState: updatedEncountersState,
         monstersDefeated: get().dungeon.monstersDefeated + 1,
-        roomEnemiesRemaining: 0
+        roomEnemiesRemaining: 0,
+        level1Completed: isBoss ? true : get().dungeon.level1Completed,
+        dungeonCompleted: isBoss ? true : get().dungeon.dungeonCompleted,
+        roomsUnlocked: isBoss ? [true, true, true, true] : get().dungeon.roomsUnlocked
       }
     });
 
@@ -856,8 +871,9 @@ export const useGameStore = create((set, get) => ({
   },
 
   takeDamage: (rawDamage) => {
-    const { player, isInvulnerable, gameFlowState } = get();
-    if (isInvulnerable || player.hp <= 0) return 0;
+    const { player, isInvulnerable } = get();
+    const invuln = Boolean(isInvulnerable || player?.isInvulnerable);
+    if (invuln || player.hp <= 0) return 0;
 
     const def = player.defense || 10;
     const damageReduction = 100 / (100 + def);
@@ -1238,11 +1254,16 @@ export const useGameStore = create((set, get) => ({
   },
 
   // Record individual monster defeated during battle
-  recordMonsterDefeated: (enemyType, pos) => {
+  recordMonsterDefeated: (enemyType, pos, remainingAliveInRoom) => {
     const state = get();
     const d = { ...state.dungeon };
     d.monstersDefeated += 1;
-    d.roomEnemiesRemaining = Math.max(0, d.roomEnemiesRemaining - 1);
+
+    if (typeof remainingAliveInRoom === 'number') {
+      d.roomEnemiesRemaining = Math.max(0, remainingAliveInRoom);
+    } else {
+      d.roomEnemiesRemaining = Math.max(0, d.roomEnemiesRemaining - 1);
+    }
 
     get().updateQuestProgress('defeat_monsters', 1);
     get().updateQuestProgress('defeat_any_15', 1);
@@ -1270,8 +1291,8 @@ export const useGameStore = create((set, get) => ({
 
     set({ dungeon: d });
 
-    // If all enemies in the current battle encounter are dead -> Trigger Victory!
-    if (d.roomEnemiesRemaining === 0 && state.gameFlowState === 'BATTLE') {
+    // ONLY IF all enemies in the room are truly dead -> Trigger Victory!
+    if (d.roomEnemiesRemaining === 0 && d.currentEncounter && state.gameFlowState === 'BATTLE') {
       setTimeout(() => {
         get().onEncounterVictory(d.currentEncounter);
       }, 500);
@@ -1284,33 +1305,19 @@ export const useGameStore = create((set, get) => ({
       d.bossHp = Math.max(0, newHp);
 
       const hpPercent = (d.bossHp / d.bossMaxHp) * 100;
-      if (hpPercent <= 25 && d.bossPhase < 4) {
-        d.bossPhase = 4;
+      // Phase 1: 100%–40%, Phase 2: 40%–0% (Threshold at 40% / 2000 HP)
+      if (hpPercent <= 40 && d.bossPhase < 2 && d.bossHp > 0) {
+        d.bossPhase = 2;
         d.bossRage = true;
         sound.playBossRoar();
-        get().addNotification('BOSS ENRAGED!', 'Abyss Warden enters Phase 4: Void Frenzy!', 'danger');
-      } else if (hpPercent <= 50 && d.bossPhase < 3) {
-        d.bossPhase = 3;
-        sound.playBossRoar();
-        get().addNotification('PHASE 3: VOID CATACLYSM', 'Abyss Warden unleashes dark energy ripples!', 'danger');
-      } else if (hpPercent <= 75 && d.bossPhase < 2) {
-        d.bossPhase = 2;
-        sound.playBossRoar();
-        get().addNotification('PHASE 2: MINION SWARM', 'Abyss Warden summons void reavers!', 'danger');
+        get().addNotification('PHASE II — ABYSS UNLEASHED', 'The Sovereign of the Abyss awakens dormant fury!', 'danger');
       }
 
       if (d.bossHp <= 0) {
-        setTimeout(() => {
-          get().updateQuestProgress('defeat_boss', 1);
-          get().onEncounterVictory(d.encounters?.[4] || { primaryEnemy: { name: 'Abyss Warden', level: 25 }, hasElite: true });
-          get().openExtractionModal({
-            id: 'boss_extraction',
-            name: 'Abyss Warden',
-            rank: 'A',
-            shadowId: 'umbral_general',
-            position: [0, 0, -136]
-          });
-        }, 600);
+        d.bossHp = 0;
+        d.level1Completed = true;
+        d.dungeonCompleted = true;
+        d.roomsUnlocked = [true, true, true, true];
       }
 
       return { dungeon: d };

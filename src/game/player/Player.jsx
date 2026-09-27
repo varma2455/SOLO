@@ -37,6 +37,17 @@ export const livePlayerMetrics = {
   lockedTarget: null
 };
 
+let cameraShakeRef = null;
+
+export const triggerCameraShake = (intensity = 0.25, duration = 0.25) => {
+  const store = useGameStore.getState();
+  if (store.cameraSettings && store.cameraSettings.cameraShake === false) return;
+  if (cameraShakeRef) {
+    cameraShakeRef.intensity = intensity;
+    cameraShakeRef.timer = duration;
+  }
+};
+
 export const Player = ({ onAttackHit, onSkillTrigger }) => {
   const groupRef = useRef();
   const kaelRef = useRef();
@@ -86,12 +97,12 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     timer: 0
   });
 
-  const triggerCameraShake = (intensity = 0.25, duration = 0.25) => {
-    const store = useGameStore.getState();
-    if (store.cameraSettings && store.cameraSettings.cameraShake === false) return;
-    cameraShake.current.intensity = intensity;
-    cameraShake.current.timer = duration;
-  };
+  useEffect(() => {
+    cameraShakeRef = cameraShake.current;
+    return () => {
+      cameraShakeRef = null;
+    };
+  }, []);
 
   // -------------------------------------------------------------
   // GLOBAL CONTROLLER HELPERS (For Automated & Interactive Testing)
@@ -218,13 +229,29 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       const backHop = new THREE.Vector3(-Math.sin(playerRotation.current), 0, -Math.cos(playerRotation.current)).normalize();
       dashState.current.dir.copy(backHop);
     }
+
+    // Phantom Dash deals small damage (~50) to nearby enemies in path
+    setTimeout(() => {
+      if (onAttackHit) {
+        onAttackHit({
+          type: 'dash',
+          combo: 0,
+          position: [playerPos.current.x, playerPos.current.y, playerPos.current.z],
+          angle: playerRotation.current,
+          damage: 50,
+          multiplier: 0.6,
+          range: 3.5
+        });
+      }
+    }, 110);
   };
 
   // Beginner-Friendly 3-Hit Combo Combat with Soft Auto-Aim
   const handleBasicAttack = () => {
     const store = useGameStore.getState();
     const currentFlow = store.gameFlowState;
-    if (currentFlow !== 'BATTLE') return;
+    const isCombatAllowed = currentFlow === 'BATTLE' || store.dungeon.bossActive;
+    if (!isCombatAllowed) return;
     if (attackAnim.current.isAttacking) return;
 
     // Advance combo (1 -> 2 -> 3)
@@ -250,6 +277,8 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     triggerCameraShake(nextCombo === 3 ? 0.22 : 0.08, nextCombo === 3 ? 0.22 : 0.14);
     kaelRef.current?.triggerAttack(nextCombo);
 
+    // LMB combo = 80 / 100 / 140 damage
+    const comboDamage = nextCombo === 1 ? 80 : (nextCombo === 2 ? 100 : 140);
     const multiplier = nextCombo === 1 ? 1.0 : (nextCombo === 2 ? 1.2 : 1.8);
     const range = nextCombo === 3 ? 4.2 : 3.6;
 
@@ -261,6 +290,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
           position: [playerPos.current.x, playerPos.current.y, playerPos.current.z],
           angle: playerRotation.current,
           multiplier,
+          damage: comboDamage,
           range
         });
       }
@@ -271,12 +301,13 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     }, nextCombo === 3 ? 380 : 310);
   };
 
-  // Skill Activator (Q = Shadow Slash, R = Eclipse Dominion)
+  // Skill Activator (Q = Shadow Slash: 220 dmg, R = Eclipse Dominion: 800 dmg)
   const handleSkillPress = (skillId) => {
-    const currentFlow = useGameStore.getState().gameFlowState;
-    if (currentFlow !== 'BATTLE') return;
-
     const store = useGameStore.getState();
+    const currentFlow = store.gameFlowState;
+    const isCombatAllowed = currentFlow === 'BATTLE' || store.dungeon.bossActive;
+    if (!isCombatAllowed) return;
+
     if (!store.canUseSkill(skillId)) return;
 
     const success = store.triggerSkill(skillId);
@@ -298,6 +329,8 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       kaelRef.current?.triggerUltimate();
     }
 
+    const skillDamage = skillId === 'shadowSlash' ? 220 : (skillId === 'eclipseDominion' ? 800 : 50);
+
     setTimeout(() => {
       if (onSkillTrigger) {
         onSkillTrigger({
@@ -305,7 +338,8 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
           position: [playerPos.current.x, playerPos.current.y, playerPos.current.z],
           angle: playerRotation.current,
           range: skill.range || skill.radius || 5.5,
-          multiplier: skill.damageMultiplier
+          multiplier: skill.damageMultiplier,
+          damage: skillDamage
         });
       }
     }, 150);
@@ -360,7 +394,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       // Pointer lock request on canvas click
       if (e.button === 0 && !document.pointerLockElement) {
         const canvasEl = document.querySelector('canvas');
-        if (canvasEl && (e.target === canvasEl || canvasEl.contains(e.target))) {
+        if (canvasEl && (e.target === canvasEl || (e.target instanceof Node && canvasEl.contains(e.target)))) {
           try {
             canvasEl.requestPointerLock?.();
           } catch (_) {}
@@ -369,7 +403,8 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
 
       if (['MONSTER_DISCOVERED', 'ENCOUNTER_DECISION', 'PREPARING', 'BATTLE_LOADING', 'DEFEAT'].includes(currentFlow)) return;
 
-      if (e.button === 0 && currentFlow === 'BATTLE') {
+      const isCombat = currentFlow === 'BATTLE' || useGameStore.getState().dungeon.bossActive;
+      if (e.button === 0 && isCombat) {
         handleBasicAttack();
       }
     };
@@ -472,6 +507,7 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     globalPlayerState.pos.set(playerPos.current.x, 1.0, playerPos.current.z);
     globalPlayerState.posVec.set(playerPos.current.x, 1.0, playerPos.current.z);
     globalPlayerState.rotation = playerRotation.current;
+    globalPlayerState.isInvulnerable = Boolean(isInvulnerable || dashState.current.active);
     if (typeof window !== 'undefined') {
       window.__playerPos = [playerPos.current.x, 1.0, playerPos.current.z];
     }
@@ -532,8 +568,11 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
     }
 
     // -----------------------------------------------------------
-    // 2. CAMERA CONTROLLER (Smooth Third-Person Follow)
+    // 2. CAMERA CONTROLLER (Smooth Third-Person Follow & Boss Intro Framing)
     // -----------------------------------------------------------
+    const dungeonState = useGameStore.getState().dungeon;
+    const isBossIntro = Boolean(dungeonState && dungeonState.bossIntroActive);
+
     let shakeX = 0;
     let shakeY = 0;
     if (cameraShake.current.timer > 0) {
@@ -543,20 +582,33 @@ export const Player = ({ onAttackHit, onSkillTrigger }) => {
       shakeY = (Math.random() - 0.5) * intensity;
     }
 
-    const camDist = dashState.current.isDashing ? 5.4 : 6.4;
-    const camHeight = 2.6;
-    const camYaw = inputManager.mouse.yaw;
-    const camPitch = inputManager.mouse.pitch;
+    if (isBossIntro) {
+      // Cinematic Boss Framing (Section 12): Camera smoothly pulls back and elevates to frame PLAYER + BOSS
+      const introCamX = playerPos.current.x * 0.4;
+      const introCamY = 4.2;
+      const introCamZ = Math.max(playerPos.current.z + 9.5, -118);
+      camTarget.current.set(introCamX + shakeX, introCamY + shakeY, introCamZ);
+      camera.position.lerp(camTarget.current, 1 - Math.exp(-5 * dt));
 
-    const camX = playerPos.current.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist + shakeX;
-    const camY = playerPos.current.y + camHeight + Math.sin(camPitch) * camDist * 0.6 + shakeY;
-    const camZ = playerPos.current.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+      // Look slightly above the midpoint between player and boss to frame the colossal sovereign
+      lookTarget.current.set(0, 3.0, -137);
+      camera.lookAt(lookTarget.current);
+    } else {
+      const camDist = dashState.current.isDashing ? 5.4 : 6.4;
+      const camHeight = 2.6;
+      const camYaw = inputManager.mouse.yaw;
+      const camPitch = inputManager.mouse.pitch;
 
-    camTarget.current.set(camX, Math.max(0.6, camY), camZ);
-    const damp = 1 - Math.exp(-20 * dt);
-    camera.position.lerp(camTarget.current, damp);
-    lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.2, playerPos.current.z);
-    camera.lookAt(lookTarget.current);
+      const camX = playerPos.current.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist + shakeX;
+      const camY = playerPos.current.y + camHeight + Math.sin(camPitch) * camDist * 0.6 + shakeY;
+      const camZ = playerPos.current.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+
+      camTarget.current.set(camX, Math.max(0.6, camY), camZ);
+      const damp = 1 - Math.exp(-20 * dt);
+      camera.position.lerp(camTarget.current, damp);
+      lookTarget.current.set(playerPos.current.x, playerPos.current.y + 1.2, playerPos.current.z);
+      camera.lookAt(lookTarget.current);
+    }
   });
 
   return (

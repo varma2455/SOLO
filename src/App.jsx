@@ -31,10 +31,11 @@ export const App = () => {
   // Global hotkeys for menu screens
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const key = e.key.toLowerCase();
+      if (!e.key) return;
+      const tagName = e.target?.tagName ? e.target.tagName.toLowerCase() : '';
+      if (['input', 'textarea'].includes(tagName)) return;
 
-      // Don't trigger if typing in an input
-      if (['input', 'textarea'].includes(e.target.tagName.toLowerCase())) return;
+      const key = e.key.toLowerCase();
 
       if (key === 'c') {
         setScreen(currentScreen === 'character' ? 'game' : 'character');

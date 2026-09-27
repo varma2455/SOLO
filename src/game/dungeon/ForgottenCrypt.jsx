@@ -174,19 +174,22 @@ export const ForgottenCrypt = () => {
   return (
     <group>
       {/* --- REALISTIC VISIBLE DUNGEON LIGHTING --- */}
-      {/* Visible dark fantasy ambient light */}
-      <ambientLight intensity={0.75} color="#cbd5e1" />
+      {/* Visible dark fantasy indigo-slate ambient light */}
+      <ambientLight intensity={0.8} color="#25243b" />
 
-      {/* Primary directional moonbeam casting crisp shadows */}
+      {/* Primary directional cold moonbeam casting crisp, deep gothic shadows */}
       <directionalLight
-        position={[12, 28, 10]}
-        intensity={1.8}
-        color="#f1f5f9"
+        position={[15, 30, 12]}
+        intensity={2.2}
+        color="#e2e8f0"
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
         shadow-bias={-0.0005}
       />
+
+      {/* Subtle purple volumetric rim fill */}
+      <directionalLight position={[-15, 20, -30]} intensity={0.65} color="#7c3aed" />
 
       {/* Atmospheric Underground Floating Dust Particles */}
       <DungeonDustMotes count={100} />
@@ -501,18 +504,10 @@ export const ForgottenCrypt = () => {
         return <GrandColumn key={i} position={[x, 0, z]} height={9.5} broken={i === 2 || i === 5} />;
       })}
 
-      {/* Grand Arcane Boss Seal Floor Circles */}
-      <mesh position={[0, 0.02, -136]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[11, 12.8, 48]} />
-        <meshBasicMaterial color="#9333ea" transparent opacity={0.7} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[0, 0.02, -136]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[18, 19.5, 48]} />
-        <meshBasicMaterial color="#7c3aed" transparent opacity={0.4} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[0, 0.02, -136]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[6.5, 36]} />
-        <meshBasicMaterial color="#2e1065" transparent opacity={0.65} side={THREE.DoubleSide} />
+      {/* Subtle Central Arena Paving Dial */}
+      <mesh position={[0, 0.01, -136]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[8.0, 8.4, 48]} />
+        <meshStandardMaterial color="#1a1924" roughness={0.9} />
       </mesh>
 
       {/* Weathered Demon King Throne at North End */}

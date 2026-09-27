@@ -162,17 +162,31 @@ export const HUD = () => {
   }, [isDebug]);
 
 
-  // Boss Encounter Cinematic Intro
+  // Ghost Boss HP for smooth animated damage draining (Section 22)
+  const [ghostBossHp, setGhostBossHp] = useState(dungeon.bossHp);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setGhostBossHp((prev) => {
+        if (prev > dungeon.bossHp) {
+          return Math.max(dungeon.bossHp, prev - (dungeon.bossMaxHp * 0.035));
+        }
+        return dungeon.bossHp;
+      });
+    }, 40);
+    return () => clearInterval(timer);
+  }, [dungeon.bossHp, dungeon.bossMaxHp]);
+
+  // Boss Encounter Cinematic Intro (Section 13)
   const [showBossIntro, setShowBossIntro] = useState(false);
   const bossActive = dungeon.bossActive;
 
   useEffect(() => {
-    if (bossActive) {
+    if (bossActive && (dungeon.bossIntroActive || !showBossIntro)) {
       setShowBossIntro(true);
       const timer = setTimeout(() => setShowBossIntro(false), 3800);
       return () => clearTimeout(timer);
     }
-  }, [bossActive]);
+  }, [bossActive, dungeon.bossIntroActive]);
 
   const now = Date.now() / 1000;
 
@@ -236,37 +250,82 @@ export const HUD = () => {
         </div>
       )}
 
-      {/* Cinematic Boss Introduction Card */}
-      {showBossIntro && (
+      {/* Cinematic Boss Introduction Card (Section 13) */}
+      {(showBossIntro || dungeon.bossIntroActive) && (
         <div
           style={{
             position: 'absolute',
-            top: '32%',
+            top: '34%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
             textAlign: 'center',
             pointerEvents: 'none',
-            zIndex: 45
+            zIndex: 48,
+            animation: 'fadeIn 0.5s ease-out'
           }}
         >
-          <div style={{ fontSize: 13, letterSpacing: '6px', color: '#f87171', fontWeight: 800 }}>
-            ANCIENT SOVEREIGN AWAKENS
-          </div>
           <div
             style={{
               fontFamily: 'var(--font-cinzel)',
               fontWeight: 900,
-              fontSize: 'clamp(32px, 5vw, 48px)',
-              color: '#f3f4f6',
-              letterSpacing: '4px',
-              textShadow: '0 0 30px rgba(168, 85, 247, 0.9), 0 0 60px rgba(147, 51, 234, 0.6)',
-              margin: '8px 0'
+              fontSize: 'clamp(38px, 6vw, 56px)',
+              color: '#ffffff',
+              letterSpacing: '6px',
+              textShadow: '0 0 35px rgba(168, 85, 247, 0.95), 0 0 70px rgba(220, 38, 38, 0.65)',
+              margin: '0 0 6px 0'
             }}
           >
-            BOSS ENCOUNTER: ABYSS WARDEN
+            ABYSS WARDEN
           </div>
-          <div style={{ fontSize: 14, color: '#c084fc', letterSpacing: '3px', fontWeight: 700 }}>
-            RANK A &bull; MONARCH OF THE FORGOTTEN CRYPT
+          <div
+            style={{
+              fontSize: 14,
+              letterSpacing: '7px',
+              color: '#c084fc',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              textShadow: '0 0 20px #9333ea',
+              marginBottom: 10
+            }}
+          >
+            SOVEREIGN OF THE ABYSS
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12
+            }}
+          >
+            <span
+              style={{
+                background: '#dc2626',
+                color: '#ffffff',
+                fontSize: 12,
+                fontWeight: 900,
+                padding: '3px 10px',
+                borderRadius: 3,
+                letterSpacing: '2px'
+              }}
+            >
+              LEVEL 8
+            </span>
+            <span
+              style={{
+                background: 'rgba(15, 12, 24, 0.85)',
+                border: '1px solid rgba(245, 158, 11, 0.6)',
+                color: '#f59e0b',
+                fontSize: 12,
+                fontWeight: 900,
+                padding: '3px 10px',
+                borderRadius: 3,
+                letterSpacing: '3px',
+                textShadow: '0 0 10px rgba(245, 158, 11, 0.6)'
+              }}
+            >
+              ELITE / BOSS
+            </span>
           </div>
         </div>
       )}
@@ -649,7 +708,39 @@ export const HUD = () => {
         </div>
       )}
 
-      {/* --- TOP-CENTER: BOSS HP BAR (WHEN ACTIVE) --- */}
+      {/* DEVELOPER DEBUG HUD DISPLAY: Requirement 12 */}
+      {dungeon.currentRoom === 1 && (
+        <div
+          id="developer-room1-enemies-hud"
+          style={{
+            position: 'absolute',
+            top: activeEncounter ? 80 : 16,
+            left: 20,
+            zIndex: 9999,
+            padding: '6px 14px',
+            background: 'rgba(15, 23, 42, 0.92)',
+            border: '1px solid rgba(56, 189, 248, 0.6)',
+            borderRadius: 6,
+            color: '#38bdf8',
+            fontFamily: 'monospace',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.5px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.6)',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8' }} />
+          <span>
+            {`ROOM 1 ENEMIES: 10 | ALIVE: ${dungeon.roomEnemiesRemaining ?? 10} | DEAD: ${Math.max(0, 10 - (dungeon.roomEnemiesRemaining ?? 10))}`}
+          </span>
+        </div>
+      )}
+
+      {/* --- TOP-CENTER: CINEMATIC GOTHIC BOSS HP BAR (WHEN ACTIVE - Section 22) --- */}
       {dungeon.bossActive && dungeon.bossHp > 0 && (
         <div
           className="glass-panel"
@@ -658,34 +749,141 @@ export const HUD = () => {
             top: 20,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: '12px 28px',
-            minWidth: 460,
-            border: dungeon.bossRage ? '1px solid #ef4444' : '1px solid rgba(168, 85, 247, 0.5)',
-            boxShadow: dungeon.bossRage ? '0 0 25px rgba(239, 68, 68, 0.5)' : '0 0 20px rgba(147, 51, 234, 0.4)',
+            padding: '14px 36px',
+            minWidth: 580,
+            background: 'linear-gradient(180deg, rgba(14, 11, 22, 0.96), rgba(6, 5, 10, 0.98))',
+            border: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage)
+              ? '2px solid #ef4444'
+              : '1px solid rgba(168, 85, 247, 0.65)',
+            boxShadow: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage)
+              ? '0 0 35px rgba(239, 68, 68, 0.65), inset 0 0 20px rgba(185, 28, 28, 0.35)'
+              : '0 0 30px rgba(147, 51, 234, 0.5), inset 0 0 15px rgba(88, 28, 135, 0.3)',
+            borderRadius: '4px',
             textAlign: 'center',
-            pointerEvents: 'auto'
+            pointerEvents: 'auto',
+            backdropFilter: 'blur(8px)',
+            zIndex: 42
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div style={{ fontFamily: 'var(--font-cinzel)', fontWeight: 900, fontSize: 18, color: dungeon.bossRage ? '#f87171' : '#f3f4f6', letterSpacing: '2px' }}>
-              ABYSS WARDEN {dungeon.bossRage && <span style={{ color: '#ef4444', fontSize: 13 }}>[RAGE MODE]</span>}
+          {/* Header Row: Name, Level Crest & Phase Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span
+                style={{
+                  background: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage) ? '#dc2626' : '#7c3aed',
+                  color: '#ffffff',
+                  fontSize: 11,
+                  fontWeight: 900,
+                  padding: '3px 8px',
+                  borderRadius: 3,
+                  letterSpacing: '1.5px'
+                }}
+              >
+                LEVEL 8 BOSS
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-cinzel)',
+                  fontWeight: 900,
+                  fontSize: 21,
+                  color: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage) ? '#f87171' : '#f3f4f6',
+                  letterSpacing: '3px',
+                  textShadow: '0 0 12px rgba(0,0,0,0.9)'
+                }}
+              >
+                ABYSS WARDEN {(dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage) && (
+                  <span style={{ color: '#ef4444', fontSize: 13, letterSpacing: '1px' }}>[UNLEASHED]</span>
+                )}
+              </span>
             </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-purple-light)' }}>
-              PHASE {dungeon.bossPhase} / 4
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: '#f59e0b', fontSize: 13, fontWeight: 800, letterSpacing: '2px' }}>
+                ★★★★★
+              </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage) ? '#fca5a5' : 'var(--accent-purple-light)',
+                  letterSpacing: '1px'
+                }}
+              >
+                {(dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage)
+                  ? 'PHASE II — ABYSS UNLEASHED'
+                  : 'PHASE I — OBSIDIAN BULWARK'}
+              </span>
             </div>
           </div>
-          <div style={{ width: '100%', height: 14, background: 'rgba(0, 0, 0, 0.8)', borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+
+          {/* Bar Outer Trench with Ghost HP Damage Drain */}
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: 18,
+              background: 'rgba(4, 4, 8, 0.95)',
+              borderRadius: 3,
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.9)'
+            }}
+          >
+            {/* 40% Phase Transition Marker Notch */}
             <div
               style={{
+                position: 'absolute',
+                left: '40%',
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: 'rgba(239, 68, 68, 0.85)',
+                zIndex: 4,
+                boxShadow: '0 0 6px #ef4444'
+              }}
+            />
+
+            {/* Ghost Health Bar (Animated damage drain - Section 22) */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: `${Math.max(0, (ghostBossHp / dungeon.bossMaxHp) * 100)}%`,
+                background: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage) ? '#fca5a5' : '#fef08a',
+                opacity: 0.65,
+                zIndex: 1,
+                transition: 'width 0.1s linear'
+              }}
+            />
+
+            {/* Dynamic Active HP Fill */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
                 width: `${Math.max(0, (dungeon.bossHp / dungeon.bossMaxHp) * 100)}%`,
-                height: '100%',
-                background: dungeon.bossRage ? 'linear-gradient(90deg, #991b1b, #ef4444)' : 'linear-gradient(90deg, #581c87, #a855f7)',
-                transition: 'width 0.15s ease-out'
+                background: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage)
+                  ? 'linear-gradient(90deg, #991b1b, #ef4444, #f97316)'
+                  : 'linear-gradient(90deg, #4c1d95, #7c3aed, #c084fc)',
+                zIndex: 2,
+                transition: 'width 0.15s ease-out',
+                boxShadow: (dungeon.bossHp / dungeon.bossMaxHp <= 0.4 || dungeon.bossRage)
+                  ? '0 0 14px #ef4444'
+                  : '0 0 12px #a855f7'
               }}
             />
           </div>
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontWeight: 600 }}>
-            HP: {Math.round(dungeon.bossHp)} / {dungeon.bossMaxHp}
+
+          {/* Bottom Row: Exact HP and Percentage */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', marginTop: 6, fontWeight: 600 }}>
+            <span>SOVEREIGN OF THE ABYSS</span>
+            <span>
+              HP: {Math.round(dungeon.bossHp).toLocaleString()} / {dungeon.bossMaxHp.toLocaleString()} (
+              {Math.round(Math.max(0, (dungeon.bossHp / dungeon.bossMaxHp) * 100))}%)
+            </span>
           </div>
         </div>
       )}

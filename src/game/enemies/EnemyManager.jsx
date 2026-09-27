@@ -49,6 +49,7 @@ export const EnemyManager = ({
   const [enemies, setEnemies] = useState([]);
   const [loots, setLoots] = useState([]);
   const [beacons, setBeacons] = useState([]);
+  const [bossDefeatedResolved, setBossDefeatedResolved] = useState(false);
   const frameCounter = useRef(0);
 
   // Check if any commander is alive to broadcast commander aura buff
@@ -72,24 +73,44 @@ export const EnemyManager = ({
     onLivingEnemiesChange(living);
   }, [enemies, dungeon.bossActive, dungeon.bossHp, onLivingEnemiesChange]);
 
-  // Synchronize enemies whenever dungeon encounters or state change
+  const initializedRoomsRef = useRef(new Set());
+  const currentSeedRef = useRef(null);
+
+  // Synchronize enemies: spawn unspawned rooms without overwriting existing living enemies!
   useEffect(() => {
     const encMap = dungeon.encounters || generateDungeonEncounters(dungeon.rank || 'E', player.level || 1, dungeon.seed || 133789);
     const encState = dungeon.encountersState || {};
-    const visibleEnemies = [];
+
+    // Reset if dungeon seed truly changed (e.g., new game or different dungeon)
+    if (currentSeedRef.current !== null && currentSeedRef.current !== dungeon.seed) {
+      initializedRoomsRef.current.clear();
+      setEnemies([]);
+    }
+    currentSeedRef.current = dungeon.seed;
+
+    const roomsToAdd = [];
 
     // For rooms 1, 2, 3: render enemies if the encounter is NOT defeated
     for (let r = 1; r <= 3; r++) {
       const enc = encMap[r];
       if (enc && !encState[enc.id]?.defeated && !enc.defeated) {
-        if (enc.enemies) {
-          visibleEnemies.push(...enc.enemies);
+        if (!initializedRoomsRef.current.has(enc.id)) {
+          initializedRoomsRef.current.add(enc.id);
+          if (enc.enemies) {
+            roomsToAdd.push(...enc.enemies);
+          }
         }
       }
     }
 
-    setEnemies(visibleEnemies);
-  }, [dungeon.encounters, dungeon.encountersState, dungeon.seed, dungeon.rank]);
+    if (roomsToAdd.length > 0) {
+      setEnemies((prev) => {
+        const existingIds = new Set(prev.map((e) => e.id));
+        const novel = roomsToAdd.filter((e) => !existingIds.has(e.id));
+        return novel.length > 0 ? [...prev, ...novel] : prev;
+      });
+    }
+  }, [dungeon.encounters, dungeon.encountersState, dungeon.seed, dungeon.rank, player.level]);
 
   // Proximity Detection Loop: checks distance to undefeated monsters during EXPLORING mode
   useFrame(() => {
@@ -153,17 +174,26 @@ export const EnemyManager = ({
     handleShadowAttackEnemy(shadowAttackEvent.shadow, shadowAttackEvent.enemyId, shadowAttackEvent.power);
   }, [shadowAttackEvent, gameFlowState]);
 
-  // Process Basic Attack Hits (Only active during BATTLE)
+  // Process Basic & Dash Attack Hits (Active during BATTLE or Boss Encounter)
   useEffect(() => {
-    if (!combatAttackEvent || gameFlowState !== 'BATTLE') return;
-    const { position, angle, multiplier, range } = combatAttackEvent;
+    const isCombat = gameFlowState === 'BATTLE' || dungeon.bossActive;
+    if (!combatAttackEvent || !isCombat) return;
+    const { position, angle, multiplier, range, damage: explicitDamage, type: atkType, combo } = combatAttackEvent;
+
+    const attackKey = atkType === 'dash' ? 'dash' : (combo ? `combo${combo}` : explicitDamage);
 
     // Check hit on Boss
-    if (dungeon.bossActive && dungeon.bossHp > 0) {
+    if (dungeon.bossHp > 0) {
       const bossPos = getEnemyPosition('abyssWarden', [0, 0, -138]);
-      const isBossHit = checkConeCollision(position, angle, bossPos, range + 2.8, 85);
+      let isBossHit = false;
+      if (atkType === 'dash') {
+        isBossHit = checkCircleCollision(position, bossPos, range + 2.5);
+      } else {
+        isBossHit = checkConeCollision(position, angle, bossPos, range + 2.8, 85);
+      }
+
       if (isBossHit) {
-        const { damage, isCrit } = calculatePlayerDamage(multiplier);
+        const { damage, isCrit } = calculatePlayerDamage(multiplier, attackKey);
         sound.playHit(isCrit);
         addDamageText(damage, [bossPos[0], 2.8, bossPos[2]], isCrit);
         updateBossHp(dungeon.bossHp - damage);
@@ -177,9 +207,15 @@ export const EnemyManager = ({
 
         const livePos = getEnemyPosition(en.id, en.spawnPosition);
         const enPos = safeVector3(livePos, [0, 1.5, 0], 'EnemyManager:combatHit');
-        const isHit = checkConeCollision(position, angle, enPos, range, 85);
+        let isHit = false;
+        if (atkType === 'dash') {
+          isHit = checkCircleCollision(position, enPos, range);
+        } else {
+          isHit = checkConeCollision(position, angle, enPos, range, 85);
+        }
+
         if (isHit) {
-          const { damage, isCrit } = calculatePlayerDamage(multiplier);
+          const { damage, isCrit } = calculatePlayerDamage(multiplier, attackKey);
           sound.playHit(isCrit);
           addDamageText(damage, [enPos[0], 1.5, enPos[2]], isCrit);
           return { ...en, hp: Math.max(0, en.hp - damage) };
@@ -189,13 +225,15 @@ export const EnemyManager = ({
     );
   }, [combatAttackEvent, gameFlowState, dungeon.bossActive, dungeon.bossHp, addDamageText, updateBossHp]);
 
-  // Process Skill Hits (Shadow Slash, Void Burst, Eclipse Dominion)
+  // Process Skill Hits (Shadow Slash: 220, Eclipse Dominion: 800)
   useEffect(() => {
-    if (!skillEvent || gameFlowState !== 'BATTLE') return;
-    const { skillId, position, angle, range, multiplier } = skillEvent;
+    const isCombat = gameFlowState === 'BATTLE' || dungeon.bossActive;
+    if (!skillEvent || !isCombat) return;
+    const { skillId, position, angle, range, multiplier, damage: explicitDamage } = skillEvent;
+    const skillKey = skillId || explicitDamage;
 
     // Hit Boss with skill
-    if (dungeon.bossActive && dungeon.bossHp > 0) {
+    if (dungeon.bossHp > 0) {
       const bossPos = getEnemyPosition('abyssWarden', [0, 0, -138]);
       let bossHit = false;
 
@@ -206,7 +244,7 @@ export const EnemyManager = ({
       }
 
       if (bossHit) {
-        const { damage, isCrit } = calculatePlayerDamage(multiplier);
+        const { damage, isCrit } = calculatePlayerDamage(multiplier, skillKey);
         sound.playHit(isCrit);
         addDamageText(damage, [bossPos[0], 3.0, bossPos[2]], isCrit);
         updateBossHp(dungeon.bossHp - damage);
@@ -228,7 +266,7 @@ export const EnemyManager = ({
         }
 
         if (hit) {
-          const { damage, isCrit } = calculatePlayerDamage(multiplier);
+          const { damage, isCrit } = calculatePlayerDamage(multiplier, skillKey);
           sound.playHit(isCrit);
           addDamageText(damage, [enPos[0], 1.6, enPos[2]], isCrit);
           return { ...en, hp: Math.max(0, en.hp - damage) };
@@ -265,7 +303,15 @@ export const EnemyManager = ({
     const safeDeath = safeVector3(deathPos, [0, 0.5, 0], 'EnemyManager:enemyDeath');
     gainXp(enemy.xpReward || 35);
     gainGold(enemy.goldReward || 15);
-    recordMonsterDefeated(enemy.id, safeDeath);
+
+    // Remove ONLY the dead enemy from the state and compute remaining alive in room
+    setEnemies((prev) => {
+      const updated = prev.filter((e) => e.id !== enemy.id);
+      const enemyRoom = enemy.room || 1;
+      const aliveRemaining = updated.filter((e) => (e.room || 1) === enemyRoom && e.hp > 0).length;
+      recordMonsterDefeated(enemy.id, safeDeath, aliveRemaining);
+      return updated;
+    });
 
     // Spawn Loot Crystal
     const droppedItems = getRandomLoot(enemy.id?.split('_')[0] || 'ashGoblin');
@@ -297,11 +343,33 @@ export const EnemyManager = ({
     }
   }, [gainXp, gainGold, recordMonsterDefeated]);
 
-  // Boss Defeated Handler
+  // Boss Defeated Handler: Plays death resolution, rewards +500 XP, +150 Gold, updates quest, unlocks Level 1, releases pointer lock
   const handleBossDefeated = useCallback((deathPos) => {
     const safeDeath = safeVector3(deathPos, [0, 0.8, -138], 'EnemyManager:bossDefeated');
-    gainXp(4500);
-    gainGold(2400);
+
+    // 1. Defeat audio & notification
+    sound.playLevelUp();
+    useGameStore.getState().addNotification('ABYSS WARDEN DEFEATED', 'Level 1 Complete — Forgotten Crypt Purged!', 'success');
+
+    // 2. Update Quest: Defeat the Abyss Warden 1/1
+    useGameStore.getState().updateQuestProgress('defeat_boss', 1);
+
+    // 3. Award +500 XP and +150 Gold
+    gainXp(500);
+    gainGold(150);
+
+    // 4. Unlock Level 1 completion & all rooms
+    useGameStore.setState((s) => ({
+      dungeon: {
+        ...s.dungeon,
+        bossActive: false,
+        level1Completed: true,
+        dungeonCompleted: true,
+        roomsUnlocked: [true, true, true, true]
+      }
+    }));
+
+    // 5. Spawn Boss Loot Crystal
     const bossLoot = getRandomLoot('abyssWarden');
     setLoots((prev) => [
       ...prev,
@@ -312,6 +380,36 @@ export const EnemyManager = ({
         rarityColor: '#f43f5e'
       }
     ]);
+
+    // 6. Show Victory / Reward Window & release pointer lock after cinematic death stagger (1.8s)
+    setTimeout(() => {
+      if (typeof document !== 'undefined') {
+        try {
+          document.exitPointerLock?.();
+        } catch (_) {}
+      }
+      useGameStore.getState().onEncounterVictory({
+        id: 'enc_r4_abyss_warden',
+        typeName: 'Abyss Warden',
+        primaryEnemy: {
+          id: 'abyssWarden',
+          name: 'Abyss Warden',
+          level: 8,
+          tier: 'boss'
+        },
+        hasElite: true,
+        xpReward: 500,
+        goldReward: 150
+      });
+      if (typeof document !== 'undefined') {
+        try {
+          document.exitPointerLock?.();
+        } catch (_) {}
+      }
+      setTimeout(() => {
+        setBossDefeatedResolved(true);
+      }, 1000);
+    }, 1800);
   }, [gainXp, gainGold]);
 
   // Boss Phase 2 & 3 summons
@@ -336,9 +434,10 @@ export const EnemyManager = ({
     setLoots((prev) => prev.filter((l) => l.id !== loot.id));
   }, [addItemToInventory]);
 
-  // Enemy attacks player (Only damages player during BATTLE)
+  // Enemy attacks player (Only damages player during BATTLE or active boss encounter)
   const handleEnemyAttackPlayer = useCallback((damage) => {
-    if (useGameStore.getState().gameFlowState !== 'BATTLE') return;
+    const store = useGameStore.getState();
+    if (store.gameFlowState !== 'BATTLE' && !store.dungeon.bossActive) return;
     const actual = takeDamage(damage);
     if (actual > 0) {
       const p = globalPlayerState?.pos || (playerPos ? safeVector3(playerPos, DEFAULT_PLAYER_POSITION) : null);
@@ -358,10 +457,12 @@ export const EnemyManager = ({
   }, [enemies, gameFlowState, setExecutableEnemyId]);
 
   // Determine whether an enemy is dormant:
-  // An enemy is ONLY active when gameFlowState === 'BATTLE' and it belongs to the active encounter.
-  const isEncounterActiveInBattle = (enemy) => {
-    if (gameFlowState !== 'BATTLE' || !activeEncounter) return false;
-    return enemy.room === activeEncounter.roomIndex;
+  // Enemies in the current player's room or adjacent rooms are ACTIVE and patrolling naturally.
+  // Only distant rooms (> 1 room away) are set to dormant to maximize performance.
+  const isEnemyDormant = (enemy) => {
+    const currentR = dungeon.currentRoom || 1;
+    const enemyR = enemy.room || 1;
+    return Math.abs(enemyR - currentR) > 1;
   };
 
   const currentPPos = playerPos || globalPlayerState?.position || DEFAULT_PLAYER_POSITION;
@@ -370,7 +471,7 @@ export const EnemyManager = ({
     <group>
       {/* Enemies in the dungeon */}
       {enemies.map((en) => {
-        const isBattleActive = isEncounterActiveInBattle(en);
+        const dormant = isEnemyDormant(en);
         return (
           <Enemy
             key={en.id}
@@ -380,13 +481,13 @@ export const EnemyManager = ({
             onEnemyAttackPlayer={handleEnemyAttackPlayer}
             commanderAlive={isCommanderAlive}
             onNearExecutable={handleNearExecutable}
-            isDormant={!isBattleActive}
+            isDormant={dormant}
           />
         );
       })}
 
-      {/* Boss Abyss Warden in Room 4 */}
-      {dungeon.bossActive && dungeon.bossHp > 0 && (
+      {/* Boss Abyss Warden in Room 4 (remains mounted during exploration, fight, and death dissolve) */}
+      {(!dungeon.encountersState?.['enc_r4_abyss_warden']?.defeated || dungeon.bossActive || dungeon.bossHp > 0) && !bossDefeatedResolved && (
         <AbyssWardenBoss
           playerPos={currentPPos}
           onBossAttackPlayer={handleEnemyAttackPlayer}
