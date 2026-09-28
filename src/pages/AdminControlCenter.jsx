@@ -56,11 +56,19 @@ export const AdminControlCenter = () => {
   const [adminStats, setAdminStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
+    adminUsers: 0,
     disabledUsers: 0,
+    totalMonsters: 0,
     totalShadows: 0,
+    totalQuests: 0,
+    totalDungeons: 0,
     totalMonstersDefeated: 0,
-    totalDungeonsCompleted: 0
+    totalDungeonsCompleted: 0,
+    recentActivity: []
   });
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [actionError, setActionError] = useState('');
   const [usersList, setUsersList] = useState([]);
   const [gameConfig, setGameConfig] = useState(null);
   const [monsters, setMonsters] = useState([]);
@@ -199,6 +207,7 @@ export const AdminControlCenter = () => {
   };
 
   const handleToggleUserRole = async (targetUser) => {
+    setActionError('');
     const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
     try {
       const res = await authFetch(`/api/admin/users/${targetUser.id}/role`, {
@@ -215,12 +224,14 @@ export const AdminControlCenter = () => {
       showSuccess(`User ${targetUser.displayName} role changed to ${newRole.toUpperCase()}`);
       await loadAllData();
     } catch (err) {
-      alert('Error updating user role: ' + err.message);
+      setActionError(err.message);
     }
   };
 
   const handleToggleUserStatus = async (targetUser) => {
-    const newStatus = targetUser.status === 'active' ? 'disabled' : 'active';
+    setActionError('');
+    const currentActive = targetUser.status === 'active';
+    const newStatus = currentActive ? 'inactive' : 'active';
     try {
       const res = await authFetch(`/api/admin/users/${targetUser.id}/status`, {
         method: 'PATCH',
@@ -236,7 +247,7 @@ export const AdminControlCenter = () => {
       showSuccess(`User ${targetUser.displayName} status set to ${newStatus.toUpperCase()}`);
       await loadAllData();
     } catch (err) {
-      alert('Error updating status: ' + err.message);
+      setActionError(err.message);
     }
   };
 
@@ -439,14 +450,14 @@ export const AdminControlCenter = () => {
         {/* Navigation Items */}
         <nav style={{ padding: '16px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
-            { id: 'dashboard', label: 'DASHBOARD', icon: <LayoutDashboard size={18} /> },
+            { id: 'dashboard', label: 'ADMIN DASHBOARD', icon: <LayoutDashboard size={18} /> },
             { id: 'users', label: 'USERS', icon: <Users size={18} /> },
             { id: 'monsters', label: 'MONSTERS', icon: <Skull size={18} /> },
             { id: 'shadows', label: 'SHADOWS', icon: <Ghost size={18} /> },
             { id: 'quests', label: 'QUESTS', icon: <ScrollText size={18} /> },
             { id: 'dungeons', label: 'DUNGEONS', icon: <Castle size={18} /> },
-            { id: 'settings', label: 'GAME SETTINGS', icon: <Sliders size={18} /> },
-            { id: 'statistics', label: 'STATISTICS', icon: <BarChart3 size={18} /> }
+            { id: 'statistics', label: 'STATISTICS', icon: <BarChart3 size={18} /> },
+            { id: 'settings', label: 'SETTINGS', icon: <Sliders size={18} /> }
           ].map((item) => {
             const isSelected = activeTab === item.id;
             return (
@@ -509,6 +520,7 @@ export const AdminControlCenter = () => {
           </div>
 
           <button
+            id="admin-logout-button"
             onClick={handleLogout}
             style={{
               display: 'flex',
@@ -611,12 +623,12 @@ export const AdminControlCenter = () => {
           {activeTab === 'dashboard' && (
             <div>
               {/* Telemetry Stat Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 32 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
                 {/* Total Users */}
                 <div
                   className="glass-panel"
                   style={{
-                    padding: '22px',
+                    padding: '20px',
                     borderRadius: 8,
                     border: '1px solid rgba(168, 85, 247, 0.35)',
                     background: 'rgba(168, 85, 247, 0.05)'
@@ -628,17 +640,17 @@ export const AdminControlCenter = () => {
                     </span>
                     <Users size={18} color="#c084fc" />
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.totalUsers}
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.totalUsers || usersList.length}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Registered player accounts</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Total registered users</div>
                 </div>
 
                 {/* Active Users */}
                 <div
                   className="glass-panel"
                   style={{
-                    padding: '22px',
+                    padding: '20px',
                     borderRadius: 8,
                     border: '1px solid rgba(34, 197, 94, 0.35)',
                     background: 'rgba(34, 197, 94, 0.05)'
@@ -650,17 +662,17 @@ export const AdminControlCenter = () => {
                     </span>
                     <CheckCircle2 size={18} color="#22c55e" />
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.activeUsers}
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.activeUsers || usersList.filter(u => u.status === 'active').length}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Authorized & cleared to enter</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Active status users</div>
                 </div>
 
-                {/* Disabled Users */}
+                {/* Admin Users */}
                 <div
                   className="glass-panel"
                   style={{
-                    padding: '22px',
+                    padding: '20px',
                     borderRadius: 8,
                     border: '1px solid rgba(239, 68, 68, 0.35)',
                     background: 'rgba(239, 68, 68, 0.05)'
@@ -668,21 +680,43 @@ export const AdminControlCenter = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#f87171', letterSpacing: '1px' }}>
-                      DISABLED USERS
+                      ADMIN USERS
                     </span>
-                    <Ban size={18} color="#ef4444" />
+                    <Crown size={18} color="#ef4444" />
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.disabledUsers}
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.adminUsers || usersList.filter(u => u.role === 'admin').length}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Restricted login access</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Overseer administrators</div>
+                </div>
+
+                {/* Total Monsters */}
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: '20px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(234, 179, 8, 0.35)',
+                    background: 'rgba(234, 179, 8, 0.05)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#facc15', letterSpacing: '1px' }}>
+                      TOTAL MONSTERS
+                    </span>
+                    <Skull size={18} color="#eab308" />
+                  </div>
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.totalMonsters || monsters.length || 5}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Registered enemy types</div>
                 </div>
 
                 {/* Total Shadows */}
                 <div
                   className="glass-panel"
                   style={{
-                    padding: '22px',
+                    padding: '20px',
                     borderRadius: 8,
                     border: '1px solid rgba(168, 85, 247, 0.35)',
                     background: 'rgba(168, 85, 247, 0.05)'
@@ -694,39 +728,17 @@ export const AdminControlCenter = () => {
                     </span>
                     <Ghost size={18} color="#a855f7" />
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.totalShadows}
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.totalShadows || shadows.length || 5}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Souls extracted into shadow armies</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Shadow army definitions</div>
                 </div>
 
-                {/* Total Monsters Defeated */}
+                {/* Total Quests */}
                 <div
                   className="glass-panel"
                   style={{
-                    padding: '22px',
-                    borderRadius: 8,
-                    border: '1px solid rgba(234, 179, 8, 0.35)',
-                    background: 'rgba(234, 179, 8, 0.05)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#facc15', letterSpacing: '1px' }}>
-                      TOTAL MONSTERS DEFEATED
-                    </span>
-                    <Skull size={18} color="#eab308" />
-                  </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.totalMonstersDefeated}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Crypt fiends annihilated</div>
-                </div>
-
-                {/* Total Dungeons Completed */}
-                <div
-                  className="glass-panel"
-                  style={{
-                    padding: '22px',
+                    padding: '20px',
                     borderRadius: 8,
                     border: '1px solid rgba(59, 130, 246, 0.35)',
                     background: 'rgba(59, 130, 246, 0.05)'
@@ -734,15 +746,106 @@ export const AdminControlCenter = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: '1px' }}>
-                      TOTAL DUNGEONS COMPLETED
+                      TOTAL QUESTS
                     </span>
-                    <Castle size={18} color="#3b82f6" />
+                    <ScrollText size={18} color="#3b82f6" />
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: '#f8fafc' }}>
-                    {adminStats.totalDungeonsCompleted}
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.totalQuests || quests.length || 5}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Crypt clearances achieved</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Active hunter quests</div>
                 </div>
+
+                {/* Total Dungeons */}
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: '20px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(244, 63, 94, 0.35)',
+                    background: 'rgba(244, 63, 94, 0.05)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fb7185', letterSpacing: '1px' }}>
+                      TOTAL DUNGEONS
+                    </span>
+                    <Castle size={18} color="#f43f5e" />
+                  </div>
+                  <div style={{ fontSize: 30, fontWeight: 900, color: '#f8fafc' }}>
+                    {adminStats.totalDungeons || dungeons.length || 1}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Crypt configurations</div>
+                </div>
+              </div>
+
+              {/* Recent Activity Audit Log */}
+              <div className="glass-panel" style={{ padding: '24px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.09)', marginBottom: 28 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ fontFamily: 'var(--font-cinzel)', fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '1.5px', color: '#f8fafc' }}>
+                    RECENT ACTIVITY
+                  </h3>
+                  <span style={{ fontSize: 11, color: '#94a3b8', letterSpacing: '1px' }}>
+                    ADMIN AUDIT LOGS
+                  </span>
+                </div>
+
+                {adminStats.recentActivity && adminStats.recentActivity.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {adminStats.recentActivity.slice(0, 8).map((log, idx) => {
+                      const isRole = log.action === 'ROLE_CHANGED';
+                      const isAct = log.action === 'USER_ACTIVATED';
+                      const isDeact = log.action === 'USER_DEACTIVATED';
+                      const isPwd = log.action === 'PASSWORD_RESET_REQUESTED';
+                      const badgeColor = isRole ? '#c084fc' : isAct ? '#4ade80' : isDeact ? '#f87171' : '#facc15';
+                      const badgeBg = isRole ? 'rgba(168, 85, 247, 0.15)' : isAct ? 'rgba(34, 197, 94, 0.15)' : isDeact ? 'rgba(239, 68, 68, 0.15)' : 'rgba(234, 179, 8, 0.15)';
+
+                      return (
+                        <div
+                          key={log.id || idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            borderRadius: 6,
+                            border: '1px solid rgba(255, 255, 255, 0.05)',
+                            fontSize: 12,
+                            gap: 12
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: 4,
+                                background: badgeBg,
+                                color: badgeColor,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                letterSpacing: '1px'
+                              }}
+                            >
+                              {log.action}
+                            </span>
+                            <span style={{ color: '#cbd5e1' }}>
+                              Target: <strong style={{ color: '#f8fafc' }}>{log.targetUserId}</strong>
+                              {log.newRole && <span style={{ color: '#94a3b8' }}> → {log.newRole.toUpperCase()}</span>}
+                            </span>
+                          </div>
+                          <div style={{ color: '#94a3b8', fontSize: 11 }}>
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Recent'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 13, background: 'rgba(255, 255, 255, 0.02)', borderRadius: 6 }}>
+                    No recent administrative activity recorded. User role transitions and status changes will appear here.
+                  </div>
+                )}
               </div>
 
               {/* Overseer Command Shortcuts */}
@@ -820,6 +923,35 @@ export const AdminControlCenter = () => {
           {/* ========================================================================= */}
           {activeTab === 'users' && (
             <div>
+              {/* Action Error Alert */}
+              {actionError && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.5)',
+                    borderRadius: 6,
+                    color: '#fca5a5',
+                    fontSize: 13,
+                    marginBottom: 16
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <span>{actionError}</span>
+                  </div>
+                  <button
+                    onClick={() => setActionError('')}
+                    style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', display: 'flex' }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
                 <div>
                   <h2 style={{ fontFamily: 'var(--font-cinzel)', fontSize: 20, fontWeight: 900, margin: 0, letterSpacing: '1px' }}>
@@ -830,8 +962,9 @@ export const AdminControlCenter = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ position: 'relative', width: 280 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {/* Search */}
+                  <div style={{ position: 'relative', width: 220 }}>
                     <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                     <input
                       id="admin-search-users-input"
@@ -851,6 +984,46 @@ export const AdminControlCenter = () => {
                       }}
                     />
                   </div>
+
+                  {/* Role Filter */}
+                  <select
+                    id="admin-filter-role"
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    style={{
+                      padding: '9px 12px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="all" style={{ backgroundColor: '#0f172a' }}>All Roles</option>
+                    <option value="user" style={{ backgroundColor: '#0f172a' }}>USER</option>
+                    <option value="admin" style={{ backgroundColor: '#0f172a' }}>ADMIN</option>
+                  </select>
+
+                  {/* Status Filter */}
+                  <select
+                    id="admin-filter-status"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{
+                      padding: '9px 12px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: 6,
+                      color: '#f8fafc',
+                      fontSize: 12,
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="all" style={{ backgroundColor: '#0f172a' }}>All Statuses</option>
+                    <option value="active" style={{ backgroundColor: '#0f172a' }}>ACTIVE</option>
+                    <option value="inactive" style={{ backgroundColor: '#0f172a' }}>INACTIVE</option>
+                  </select>
 
                   <button
                     id="admin-create-user-btn"
@@ -889,8 +1062,10 @@ export const AdminControlCenter = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                      <th style={{ padding: '14px 16px' }}>NAME</th>
+                      <th style={{ padding: '14px 16px' }}>AVATAR</th>
+                      <th style={{ padding: '14px 16px' }}>DISPLAY NAME</th>
                       <th style={{ padding: '14px 16px' }}>EMAIL</th>
+                      <th style={{ padding: '14px 16px' }}>UID</th>
                       <th style={{ padding: '14px 16px' }}>ROLE</th>
                       <th style={{ padding: '14px 16px' }}>STATUS</th>
                       <th style={{ padding: '14px 16px' }}>CREATED</th>
@@ -901,15 +1076,28 @@ export const AdminControlCenter = () => {
                     {usersList
                       .filter((u) => {
                         const q = searchQuery.toLowerCase();
-                        return (
+                        const matchesQuery =
+                          !q ||
                           u.displayName?.toLowerCase().includes(q) ||
                           u.email?.toLowerCase().includes(q) ||
                           u.id?.toLowerCase().includes(q) ||
-                          u.status?.toLowerCase().includes(q)
-                        );
+                          u.status?.toLowerCase().includes(q);
+
+                        const matchesRole =
+                          roleFilter === 'all' ||
+                          (roleFilter === 'admin' ? u.role === 'admin' : u.role !== 'admin');
+
+                        const matchesStatus =
+                          statusFilter === 'all' ||
+                          (statusFilter === 'active' ? u.status === 'active' : (u.status === 'inactive' || u.status === 'disabled'));
+
+                        return matchesQuery && matchesRole && matchesStatus;
                       })
                       .map((u) => {
                         const isActive = u.status === 'active';
+                        const isTargetSelf = u.id === user?.id || u.email === user?.email;
+                        const avatarLetter = (u.displayName || u.email || 'U').charAt(0).toUpperCase();
+
                         return (
                           <tr
                             key={u.id}
@@ -918,11 +1106,33 @@ export const AdminControlCenter = () => {
                               transition: 'background 0.15s'
                             }}
                           >
+                            <td style={{ padding: '14px 16px' }}>
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: '50%',
+                                  background: u.role === 'admin' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(168, 85, 247, 0.25)',
+                                  border: u.role === 'admin' ? '1px solid #ef4444' : '1px solid #a855f7',
+                                  color: u.role === 'admin' ? '#f87171' : '#c084fc',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 800,
+                                  fontSize: 12
+                                }}
+                              >
+                                {avatarLetter}
+                              </div>
+                            </td>
                             <td style={{ padding: '14px 16px', fontWeight: 800, color: '#f8fafc' }}>
                               {u.displayName}
                             </td>
                             <td style={{ padding: '14px 16px', color: '#cbd5e1' }}>
                               {u.email}
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#94a3b8', fontFamily: 'monospace', fontSize: 11 }}>
+                              {u.id ? (u.id.length > 14 ? `${u.id.substring(0, 12)}...` : u.id) : 'N/A'}
                             </td>
                             <td style={{ padding: '14px 16px' }}>
                               <span
@@ -936,7 +1146,7 @@ export const AdminControlCenter = () => {
                                   letterSpacing: '1px'
                                 }}
                               >
-                                {u.role?.toUpperCase() || 'USER'}
+                                {u.role === 'admin' ? 'ADMIN' : 'USER'}
                               </span>
                             </td>
                             <td style={{ padding: '14px 16px' }}>
@@ -952,7 +1162,7 @@ export const AdminControlCenter = () => {
                                   letterSpacing: '1px'
                                 }}
                               >
-                                {isActive ? 'ACTIVE' : 'DISABLED'}
+                                {isActive ? 'ACTIVE' : 'INACTIVE'}
                               </span>
                             </td>
                             <td style={{ padding: '14px 16px', color: '#94a3b8', fontSize: 12 }}>
@@ -977,12 +1187,12 @@ export const AdminControlCenter = () => {
                                   VIEW
                                 </Link>
 
-                                {u.id !== user?.id && u.email !== user?.email ? (
+                                {!isTargetSelf ? (
                                   <>
                                     <button
                                       id={`admin-role-toggle-${u.id}`}
                                       onClick={() => handleToggleUserRole(u)}
-                                      title={u.role === 'admin' ? 'Demote to regular User' : 'Promote to Administrator'}
+                                      title={u.role === 'admin' ? 'Demote ADMIN → USER' : 'Promote USER → ADMIN'}
                                       style={{
                                         padding: '6px 10px',
                                         borderRadius: 4,
@@ -1012,7 +1222,7 @@ export const AdminControlCenter = () => {
                                         letterSpacing: '0.8px'
                                       }}
                                     >
-                                      {isActive ? 'DISABLE' : 'ENABLE'}
+                                      {isActive ? 'DEACTIVATE' : 'ACTIVATE'}
                                     </button>
 
                                     <button
@@ -1048,7 +1258,7 @@ export const AdminControlCenter = () => {
                       })}
                     {usersList.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
                           No users created yet. Click "+ CREATE USER" above to provision player accounts.
                         </td>
                       </tr>

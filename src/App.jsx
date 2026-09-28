@@ -1,13 +1,13 @@
 // -------------------------------------------------------------
 // SHADOW ASCENSION - MAIN APPLICATION ROUTING
-// Custom Authentication with Admin & User Role Isolation
+// Unified Authentication & Strict Role-Based Protected Routes
 // -------------------------------------------------------------
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { CustomAuthProvider } from './context/CustomAuthContext';
-import { ProtectedAdminRoute } from './components/ProtectedAdminRoute';
-import { ProtectedUserRoute } from './components/ProtectedUserRoute';
+import { AuthProvider } from './context/AuthContext';
+import { AdminRoute } from './routes/AdminRoute';
+import { UserRoute } from './routes/UserRoute';
 
 import { HomePage } from './pages/HomePage';
 import { UnifiedLoginPage } from './pages/UnifiedLoginPage';
@@ -25,13 +25,15 @@ import { UserSettings } from './pages/user/UserSettings';
 
 export const App = () => {
   return (
-    <CustomAuthProvider>
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
           {/* Public Landing & Authentication Pages */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<UnifiedLoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* Explicitly disallow separate admin login: redirect to unified /login */}
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
@@ -39,95 +41,168 @@ export const App = () => {
           <Route
             path="/admin"
             element={
-              <ProtectedAdminRoute>
+              <AdminRoute>
                 <Navigate to="/admin/dashboard" replace />
-              </ProtectedAdminRoute>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
             }
           />
           <Route
             path="/admin/users/:userId"
             element={
-              <ProtectedAdminRoute>
+              <AdminRoute>
                 <AdminUserProfile />
-              </ProtectedAdminRoute>
+              </AdminRoute>
             }
           />
           <Route
+            path="/admin/monsters"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/shadows"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/quests"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/dungeons"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/statistics"
+            element={
+              <AdminRoute>
+                <AdminControlCenter />
+              </AdminRoute>
+            }
+          />
+          {/* Admin tab catch-all */}
+          <Route
             path="/admin/:tab"
             element={
-              <ProtectedAdminRoute>
+              <AdminRoute>
                 <AdminControlCenter />
-              </ProtectedAdminRoute>
+              </AdminRoute>
             }
           />
 
           {/* Protected Hunter/User Routes */}
           <Route
+            path="/user"
+            element={
+              <UserRoute>
+                <Navigate to="/user/dashboard" replace />
+              </UserRoute>
+            }
+          />
+          <Route
             path="/user/dashboard"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserDashboard />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/game"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <GameRoute />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/profile"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserProfile />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/shadows"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserShadows />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/inventory"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserInventory />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/quests"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserQuests />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
           <Route
             path="/user/settings"
             element={
-              <ProtectedUserRoute>
+              <UserRoute>
                 <UserSettings />
-              </ProtectedUserRoute>
+              </UserRoute>
             }
           />
 
-          {/* Direct game access mapping */}
+          {/* Direct game & profile access aliases */}
           <Route path="/game" element={<GameRoute />} />
           <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
 
-          {/* Catch-all Fallback to Home */}
+          {/* Catch-all Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </CustomAuthProvider>
+    </AuthProvider>
   );
 };
 

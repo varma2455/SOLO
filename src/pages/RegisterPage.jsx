@@ -417,7 +417,7 @@ export const RegisterPage = () => {
               gap: 8
             }}
           >
-            {submitting ? 'AWAKENING SOUL...' : 'CREATE ACCOUNT'}
+            {submitting ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
           </button>
         </form>
 

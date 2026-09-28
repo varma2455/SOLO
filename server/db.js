@@ -611,35 +611,62 @@ export const db = {
     return dbInstance.gameSettings;
   },
 
+  addAuditLog(entry) {
+    if (!dbInstance.auditLogs) {
+      dbInstance.auditLogs = [];
+    }
+    const logItem = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      ...entry
+    };
+    dbInstance.auditLogs.unshift(logItem);
+    if (dbInstance.auditLogs.length > 200) {
+      dbInstance.auditLogs = dbInstance.auditLogs.slice(0, 200);
+    }
+    saveDatabase();
+    return logItem;
+  },
+
+  getAuditLogs() {
+    return dbInstance.auditLogs || [];
+  },
+
   getStats() {
     const users = Object.values(dbInstance.users);
-    const activeUsers = users.filter((u) => u.status === 'active' && u.role === 'user').length;
-    const disabledUsers = users.filter((u) => u.status === 'disabled').length;
-    const totalUsers = users.filter((u) => u.role === 'user').length;
+    const activeUsers = users.filter((u) => u.status === 'active').length;
+    const adminUsers = users.filter((u) => u.role === 'admin' && u.status === 'active').length;
+    const disabledUsers = users.filter((u) => u.status === 'disabled' || u.status === 'inactive').length;
+    const totalUsers = users.length;
 
-    let totalMonsters = 0;
+    let totalMonstersDefeated = 0;
     let totalBosses = 0;
-    let totalDungeons = 0;
-    let totalShadows = 0;
+    let totalDungeonsCompleted = 0;
+    let extractedShadows = 0;
 
     Object.values(dbInstance.playerProgress).forEach((p) => {
-      totalMonsters += p.monstersDefeated || 0;
+      totalMonstersDefeated += p.monstersDefeated || 0;
       totalBosses += p.bossesDefeated || 0;
-      totalDungeons += p.dungeonsCompleted || 0;
+      totalDungeonsCompleted += p.dungeonsCompleted || 0;
     });
 
     Object.values(dbInstance.playerShadows).forEach((sList) => {
-      totalShadows += Array.isArray(sList) ? sList.length : 0;
+      extractedShadows += Array.isArray(sList) ? sList.length : 0;
     });
 
     return {
       totalUsers,
       activeUsers,
+      adminUsers,
       disabledUsers,
-      totalMonstersDefeated: Math.max(totalMonsters, dbInstance.statistics.totalMonstersDefeated || 0),
-      totalBossesDefeated: Math.max(totalBosses, dbInstance.statistics.totalBossesDefeated || 0),
-      totalDungeonsCompleted: Math.max(totalDungeons, dbInstance.statistics.totalDungeonsCompleted || 0),
-      totalShadows: Math.max(totalShadows, dbInstance.statistics.totalShadowsExtracted || 0)
+      totalMonsters: (dbInstance.monsters || []).length,
+      totalShadows: (dbInstance.shadowDefinitions || []).length || Math.max(extractedShadows, dbInstance.statistics?.totalShadowsExtracted || 0),
+      totalQuests: (dbInstance.quests || []).length,
+      totalDungeons: (dbInstance.dungeons || []).length,
+      totalMonstersDefeated: Math.max(totalMonstersDefeated, dbInstance.statistics?.totalMonstersDefeated || 0),
+      totalBossesDefeated: Math.max(totalBosses, dbInstance.statistics?.totalBossesDefeated || 0),
+      totalDungeonsCompleted: Math.max(totalDungeonsCompleted, dbInstance.statistics?.totalDungeonsCompleted || 0),
+      recentActivity: (dbInstance.auditLogs || []).slice(0, 15)
     };
   }
 };

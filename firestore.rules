@@ -65,6 +65,34 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) || isAdmin();
     }
 
+    match /userGameData/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /userInventory/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /userQuests/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /userShadows/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /userStats/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // ADMIN AUDIT LOGS (adminAuditLogs/{logId})
+    // Accessible strictly by authorized administrators
+    // -------------------------------------------------------------
+    match /adminAuditLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
     // -------------------------------------------------------------
     // GAME CONFIGURATION (Monsters, Shadows, Dungeons, Settings)
     // Public/Player readable; Writable ONLY by verified administrators

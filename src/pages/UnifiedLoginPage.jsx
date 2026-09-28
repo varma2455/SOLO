@@ -20,8 +20,31 @@ export const UnifiedLoginPage = () => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Show loading screen while Firebase verifies session
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          width: '100vw',
+          backgroundColor: '#07070b',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#f8fafc',
+          gap: 16
+        }}
+      >
+        <div style={{ letterSpacing: '2px', fontSize: 13, textTransform: 'uppercase', color: '#c084fc', fontWeight: 700 }}>
+          AUTHENTICATING...
+        </div>
+      </div>
+    );
+  }
+
   // If already authenticated, redirect to appropriate portal
-  if (!loading && user) {
+  if (user) {
     if (isAdmin) {
       return <Navigate to="/admin/dashboard" replace />;
     }
@@ -40,8 +63,8 @@ export const UnifiedLoginPage = () => {
     setSubmitting(true);
     try {
       const res = await login(email.trim(), password);
-      // Backend returns authenticated user with role
-      if (res.user?.role === 'admin') {
+      const role = res.role || res.user?.role;
+      if (role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/user/dashboard', { replace: true });

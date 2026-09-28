@@ -32,12 +32,14 @@ export const AdminUserProfile = () => {
   const [userData, setUserData] = useState(null);
   const [error, setError] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [actionError, setActionError] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [resetting, setResetting] = useState(false);
 
   const loadUser = async () => {
     setLoading(true);
     setError('');
+    setActionError('');
     try {
       const res = await authFetch(`/api/admin/users/${userId}`);
       if (!res.ok) {
@@ -62,7 +64,9 @@ export const AdminUserProfile = () => {
 
   const toggleStatus = async () => {
     if (!userData?.user) return;
-    const newStatus = userData.user.status === 'active' ? 'disabled' : 'active';
+    setActionError('');
+    setActionMsg('');
+    const newStatus = userData.user.status === 'active' ? 'inactive' : 'active';
     try {
       const res = await authFetch(`/api/admin/users/${userId}/status`, {
         method: 'PATCH',
@@ -70,7 +74,7 @@ export const AdminUserProfile = () => {
         body: JSON.stringify({ status: newStatus })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setActionMsg(`Account status changed to ${newStatus.toUpperCase()}`);
         setUserData((prev) => ({
           ...prev,
@@ -78,15 +82,17 @@ export const AdminUserProfile = () => {
         }));
         setTimeout(() => setActionMsg(''), 4000);
       } else {
-        alert(data.message || 'Status update failed.');
+        setActionError(data.message || 'Status update failed.');
       }
     } catch (err) {
-      alert('Error updating status: ' + err.message);
+      setActionError(err.message || 'Error updating status.');
     }
   };
 
   const toggleRole = async () => {
     if (!userData?.user) return;
+    setActionError('');
+    setActionMsg('');
     const newRole = userData.user.role === 'admin' ? 'user' : 'admin';
     try {
       const res = await authFetch(`/api/admin/users/${userId}/role`, {
@@ -95,7 +101,7 @@ export const AdminUserProfile = () => {
         body: JSON.stringify({ role: newRole })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setActionMsg(`Account role changed to ${newRole.toUpperCase()}`);
         setUserData((prev) => ({
           ...prev,
@@ -103,10 +109,10 @@ export const AdminUserProfile = () => {
         }));
         setTimeout(() => setActionMsg(''), 4000);
       } else {
-        alert(data.message || 'Role update failed.');
+        setActionError(data.message || 'Role update failed.');
       }
     } catch (err) {
-      alert('Error updating role: ' + err.message);
+      setActionError(err.message || 'Error updating role.');
     }
   };
 
@@ -177,6 +183,26 @@ export const AdminUserProfile = () => {
         </Link>
 
         {/* Action feedback banner */}
+        {actionError && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 6,
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #ef4444',
+              color: '#f87171',
+              fontSize: 13,
+              marginBottom: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10
+            }}
+          >
+            <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+            <span>{actionError}</span>
+          </div>
+        )}
+
         {actionMsg && (
           <div
             style={{

@@ -20,19 +20,21 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'shadow_ascension_core_jwt_s
 
 export const apiApp = express();
 
+const fbAdmin = (admin && admin.apps) ? admin : (admin && admin.default ? admin.default : admin) || {};
+
 // Initialize Firebase Admin SDK if not already active
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'foodexpress-cc86b';
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.FIREBASE_SERVICE_ACCOUNT;
 
-if (admin.apps.length === 0) {
+if (fbAdmin.apps && fbAdmin.apps.length === 0) {
   try {
     if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
-      admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'))),
+      fbAdmin.initializeApp({
+        credential: fbAdmin.credential.cert(JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'))),
         projectId: PROJECT_ID
       });
     } else {
-      admin.initializeApp({ projectId: PROJECT_ID });
+      fbAdmin.initializeApp({ projectId: PROJECT_ID });
     }
   } catch (err) {
     // Non-fatal if default credentials are not local
@@ -64,8 +66,8 @@ export async function verifyAuthToken(token) {
 
   // 1. Try Firebase Admin SDK verification
   try {
-    if (admin.apps.length > 0) {
-      const decoded = await admin.auth().verifyIdToken(token);
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      const decoded = await fbAdmin.auth().verifyIdToken(token);
       return {
         id: decoded.uid,
         uid: decoded.uid,
@@ -418,30 +420,102 @@ apiApp.get('/api/admin/users/:id', requireAdmin, (req, res) => {
   });
 });
 
+// -------------------------------------------------------------
+// AUDIT LOG HELPER
+// Writes to Firestore adminAuditLogs collection and local store
+// -------------------------------------------------------------
+export async function recordAuditLog({ adminId, action, targetUserId, oldRole, newRole, details = {} }) {
+  const logEntry = {
+    adminId: adminId || 'admin',
+    action,
+    targetUserId,
+    timestamp: new Date().toISOString(),
+    ...(oldRole ? { oldRole } : {}),
+    ...(newRole ? { newRole } : {}),
+    ...details
+  };
+
+  try {
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      await fbAdmin.firestore().collection('adminAuditLogs').add({
+        adminId: logEntry.adminId,
+        action: logEntry.action,
+        targetUserId: logEntry.targetUserId,
+        ...(oldRole ? { oldRole } : {}),
+        ...(newRole ? { newRole } : {}),
+        timestamp: fbAdmin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  } catch (err) {
+    console.warn('[Audit Log] Firestore write notice:', err.message);
+  }
+
+  try {
+    db.addAuditLog(logEntry);
+  } catch (e) {}
+
+  return logEntry;
+}
+
 /**
  * PATCH /api/admin/users/:id/status
  */
-apiApp.patch('/api/admin/users/:id/status', requireAdmin, (req, res) => {
+apiApp.patch('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
   const { status } = req.body || {};
-  if (!['active', 'disabled'].includes(status)) {
-    return res.status(400).json({ success: false, message: 'Status must be active or disabled.' });
+  const normalized = status === 'disabled' ? 'inactive' : status;
+  if (!['active', 'inactive', 'disabled'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Status must be active or inactive.' });
   }
 
-  const user = db.findUserById(req.params.id);
+  const user = db.findUserById(req.params.id) || db.findUserByEmail(req.params.id);
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found.' });
   }
 
-  // Prevent disabling self
-  if (user.id === req.user.id && status === 'disabled') {
-    return res.status(400).json({ success: false, message: 'Cannot disable your own administrator account.' });
+  // Safety rule: The final active administrator cannot be demoted or deactivated
+  // unless another active administrator exists.
+  const isTargetAdmin = user.role === 'admin' || user.email?.toLowerCase() === 'pothuri2455@gmail.com';
+  if (isTargetAdmin && normalized !== 'active') {
+    const allUsers = db.getAllUsers();
+    const otherActiveAdmins = allUsers.filter(
+      (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
+             u.id !== user.id &&
+             u.email !== user.email &&
+             u.status === 'active'
+    );
+    if (otherActiveAdmins.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one active administrator must remain.'
+      });
+    }
   }
 
-  const updated = db.updateUser(user.id, { status });
+  const updated = db.updateUser(user.id, { status: normalized });
+
+  // Update in Firestore
+  try {
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      await fbAdmin.firestore().collection('users').doc(user.id).set({
+        status: normalized,
+        updatedAt: fbAdmin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (e) {
+    console.warn('[Firestore] User status update notice:', e.message);
+  }
+
+  // Record audit log
+  await recordAuditLog({
+    adminId: req.user.id || req.user.uid,
+    action: normalized === 'active' ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+    targetUserId: user.id
+  });
+
   return res.json({
     success: true,
     user: updated,
-    message: `Account status updated to ${status}.`
+    message: `Account status updated to ${normalized.toUpperCase()}.`
   });
 });
 
@@ -458,27 +532,32 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
 
   const targetId = req.params.id;
   let targetUser = db.findUserById(targetId) || db.findUserByEmail(targetId);
+  const oldRole = targetUser?.role || 'user';
 
-  // Section 13: Admin Self-Protection
-  // Do not allow the final remaining administrator to remove their own admin access unless another active administrator already exists.
+  // Safety rule: The final active administrator cannot be demoted or deactivated
+  // unless another active administrator exists.
   const allUsers = db.getAllUsers();
-  const activeAdmins = allUsers.filter(u => u.role === 'admin' && u.status !== 'disabled');
-  const isTargetAdmin = targetUser?.role === 'admin' || targetUser?.email === 'pothuri2455@gmail.com';
+  const isTargetAdmin = targetUser?.role === 'admin' || targetUser?.email?.toLowerCase() === 'pothuri2455@gmail.com';
 
   if (isTargetAdmin && role !== 'admin') {
-    const otherAdmins = activeAdmins.filter(u => u.id !== targetId && u.email !== targetUser?.email);
-    if (otherAdmins.length === 0) {
+    const otherActiveAdmins = allUsers.filter(
+      (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
+             u.id !== targetId &&
+             u.email !== targetUser?.email &&
+             u.status === 'active'
+    );
+    if (otherActiveAdmins.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot demote the final remaining administrator. Another active administrator must exist first.'
+        message: 'At least one active administrator must remain.'
       });
     }
   }
 
   // 1. Update Firebase Custom Claims (admin: true / false) via Firebase Admin SDK
   try {
-    if (admin.apps.length > 0) {
-      await admin.auth().setCustomUserClaims(targetId, { admin: role === 'admin' });
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      await fbAdmin.auth().setCustomUserClaims(targetId, { admin: role === 'admin' });
       console.log(`[Firebase Admin] Custom claim updated for ${targetId}: admin=${role === 'admin'}`);
     }
   } catch (err) {
@@ -487,10 +566,10 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
 
   // 2. Update Firestore profile users/{id}
   try {
-    if (admin.apps.length > 0) {
-      await admin.firestore().collection('users').doc(targetId).set({
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      await fbAdmin.firestore().collection('users').doc(targetId).set({
         role,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: fbAdmin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     }
   } catch (err) {
@@ -509,6 +588,15 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
       status: 'active'
     });
   }
+
+  // Record audit log
+  await recordAuditLog({
+    adminId: req.user.id || req.user.uid,
+    action: 'ROLE_CHANGED',
+    targetUserId: targetId,
+    oldRole,
+    newRole: role
+  });
 
   return res.json({
     success: true,
@@ -535,8 +623,8 @@ apiApp.post('/api/admin/users/:id/reset-password', requireAdmin, async (req, res
 
   // Use Firebase Admin SDK if active
   try {
-    if (admin.apps.length > 0) {
-      await admin.auth().updateUser(targetId, { password: newPassword });
+    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
+      await fbAdmin.auth().updateUser(targetId, { password: newPassword });
       console.log(`[Firebase Admin] Password updated for UID: ${targetId}`);
     }
   } catch (err) {
@@ -549,11 +637,25 @@ apiApp.post('/api/admin/users/:id/reset-password', requireAdmin, async (req, res
     db.updateUser(user.id, { passwordHash });
   }
 
+  // Record audit log
+  await recordAuditLog({
+    adminId: req.user.id || req.user.uid,
+    action: 'PASSWORD_RESET_REQUESTED',
+    targetUserId: targetId
+  });
+
   return res.json({
     success: true,
     message: `Password reset successfully for ${user?.displayName || 'user'}.`,
     temporaryPassword: newPassword
   });
+});
+
+/**
+ * GET /api/admin/audit-logs
+ */
+apiApp.get('/api/admin/audit-logs', requireAdmin, (req, res) => {
+  return res.json({ success: true, logs: db.getAuditLogs() });
 });
 
 /**

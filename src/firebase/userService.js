@@ -42,14 +42,15 @@ function setCachedUser(uid, data) {
 /**
  * Creates default user document upon registration
  */
-export async function createInitialUserDoc(uid, { displayName, email, role = 'player' }) {
+export async function createInitialUserDoc(uid, { displayName, email, role = 'user' }) {
   const safeName = displayName && displayName.trim() ? displayName.trim() : 'AWAKENED HUNTER';
 
   const defaultData = {
     uid,
     displayName: safeName,
     email: email || '',
-    role: role || 'player',
+    role: role === 'admin' ? 'admin' : 'user',
+    status: 'active',
     level: 1,
     xp: 0,
     maxXp: 100,
@@ -105,6 +106,7 @@ export async function createInitialUserDoc(uid, { displayName, email, role = 'pl
       totalRooms: 4
     },
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString()
   };
 
@@ -118,6 +120,7 @@ export async function createInitialUserDoc(uid, { displayName, email, role = 'pl
       setDoc(userRef, {
         ...defaultData,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp()
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore sync deferred')), 1800))

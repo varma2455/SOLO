@@ -156,6 +156,7 @@ export const UserNav = () => {
         </div>
 
         <button
+          id="hunter-logout-button"
           onClick={handleLogout}
           style={{
             display: 'flex',
