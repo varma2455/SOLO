@@ -9,8 +9,10 @@ dist-ssr/
 .env.*
 !.env.example
 serviceAccountKey.json
+service-account.json
 firebase-admin-key.json
 *.pem
+*.key
 
 # Logs
 npm-debug.log*

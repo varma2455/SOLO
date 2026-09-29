@@ -23,27 +23,172 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
-body, html {
+/* Allow text selection in admin, forms, text, and tables */
+input, textarea, select, table, p, h1, h2, h3, h4, h5, h6, span, code, pre, .admin-layout, .admin-page {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+html,
+body,
+#root {
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
   background-color: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-rajdhani);
   font-size: 16px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 #root {
-  width: 100vw;
-  height: 100vh;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================= */
+/* SHADOW ASCENSION - OVERSEER ADMIN PORTAL LAYOUT & SCROLLING   */
+/* ============================================================= */
+
+.admin-layout {
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  display: flex;
   overflow: hidden;
+  position: relative;
+  background-color: #07070b;
+}
+
+.admin-sidebar {
+  width: 260px;
+  min-width: 260px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239, 68, 68, 0.4) transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.admin-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(239, 68, 68, 0.35);
+  border-radius: 2px;
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-topbar {
+  flex-shrink: 0;
+  height: 64px;
+  z-index: 30;
+}
+
+.admin-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.4) rgba(10, 10, 18, 0.8);
+}
+
+.admin-page {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding-bottom: 24px;
+}
+
+/* Local Horizontal Scrolling for Tables */
+.users-table-container,
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollable Admin Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.modal {
+  width: min(700px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Mobile Responsiveness for Admin Portal */
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 60 !important;
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+  .admin-hamburger-btn {
+    display: flex !important;
+  }
+  .hide-mobile {
+    display: none !important;
+  }
+  .admin-content {
+    padding: 16px;
+  }
+}
+@media (min-width: 1025px) {
+  .admin-mobile-backdrop {
+    display: none !important;
+  }
 }
 
 /* Custom Scrollbars */

@@ -1,45 +1,20 @@
 // -------------------------------------------------------------
 // SHADOW ASCENSION - BACKEND AUTHENTICATION & API ROUTER
 // Express router providing:
-// - /api/auth (Login, Logout, Me, Password Change)
-// - /api/admin (User Management, Password Reset, Status, Game Content, Stats)
+// - /api/auth (Login [Deprecated], Logout, Me, Password Change)
+// - /api/admin (User Management, Status, Role Management, Content, Stats)
 // - /api/user (Personalized Game State, Shadows, Inventory, Quests)
 // -------------------------------------------------------------
 
 import fs from 'fs';
 import path from 'path';
 import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import admin from 'firebase-admin';
+import { adminApp, adminAuth, adminDb, FieldValue } from './firebaseAdmin.js';
 import { db } from './db.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'shadow_ascension_core_jwt_secret_2026_super_secure';
-
 export const apiApp = express();
-
-const fbAdmin = (admin && admin.apps) ? admin : (admin && admin.default ? admin.default : admin) || {};
-
-// Initialize Firebase Admin SDK if not already active
-const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'foodexpress-cc86b';
-const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.FIREBASE_SERVICE_ACCOUNT;
-
-if (fbAdmin.apps && fbAdmin.apps.length === 0) {
-  try {
-    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
-      fbAdmin.initializeApp({
-        credential: fbAdmin.credential.cert(JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'))),
-        projectId: PROJECT_ID
-      });
-    } else {
-      fbAdmin.initializeApp({ projectId: PROJECT_ID });
-    }
-  } catch (err) {
-    // Non-fatal if default credentials are not local
-  }
-}
 
 // Middlewares
 apiApp.use(cors({ origin: true, credentials: true }));
@@ -64,24 +39,26 @@ export function extractSessionToken(req) {
 export async function verifyAuthToken(token) {
   if (!token) return null;
 
-  // 1. Try Firebase Admin SDK verification
+  // 1. Authoritative Firebase Admin SDK verification
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      const decoded = await fbAdmin.auth().verifyIdToken(token);
-      return {
-        id: decoded.uid,
-        uid: decoded.uid,
-        email: decoded.email,
-        displayName: decoded.name || decoded.displayName || (decoded.email === 'pothuri2455@gmail.com' ? 'Game Administrator' : 'Hunter'),
-        admin: Boolean(decoded.admin) || decoded.email?.toLowerCase() === 'pothuri2455@gmail.com',
-        role: (decoded.admin || decoded.email?.toLowerCase() === 'pothuri2455@gmail.com') ? 'admin' : 'user'
-      };
-    }
+    const decoded = await adminAuth.verifyIdToken(token);
+    const isMasterAdmin = decoded.email?.toLowerCase() === 'pothuri2455@gmail.com';
+    const hasAdminClaim = decoded.admin === true;
+    const role = (hasAdminClaim || isMasterAdmin) ? 'admin' : 'user';
+
+    return {
+      id: decoded.uid,
+      uid: decoded.uid,
+      email: decoded.email,
+      displayName: decoded.name || decoded.displayName || (role === 'admin' ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
+      admin: role === 'admin',
+      role
+    };
   } catch (err) {
-    // Continue to REST / JWT verification
+    // If Admin SDK verifyIdToken failed, try Identity Toolkit REST lookup as fallback
   }
 
-  // 2. Try Google Identity Toolkit lookup via REST
+  // 2. Google Identity Toolkit lookup via REST (fallback)
   try {
     const apiKey = process.env.VITE_FIREBASE_API_KEY || 'AIzaSyB63dXav-PnSWkqlbrjpyrWllCbCkEl1uM';
     const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
@@ -107,29 +84,16 @@ export async function verifyAuthToken(token) {
         id: u.localId,
         uid: u.localId,
         email: u.email,
-        displayName: u.displayName || (isMasterAdmin ? 'Game Administrator' : 'Hunter'),
-        admin: customAdmin || isMasterAdmin,
+        displayName: u.displayName || (isMasterAdmin ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
+        admin: role === 'admin',
         role
       };
     }
   } catch (err) {
-    // Continue to JWT
+    // REST lookup failed
   }
 
-  // 3. Try Local JWT
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return {
-      id: decoded.id || decoded.uid,
-      uid: decoded.id || decoded.uid,
-      email: decoded.email,
-      displayName: decoded.displayName,
-      admin: decoded.role === 'admin' || decoded.admin === true,
-      role: decoded.role || (decoded.admin ? 'admin' : 'user')
-    };
-  } catch (err) {
-    return null;
-  }
+  return null;
 }
 
 export async function requireAuth(req, res, next) {
@@ -144,11 +108,11 @@ export async function requireAuth(req, res, next) {
   }
 
   const dbUser = db.findUserById(verified.id) || db.findUserByEmail(verified.email);
-  if (dbUser && dbUser.status === 'disabled') {
+  if (dbUser && (dbUser.status === 'disabled' || dbUser.status === 'inactive')) {
     res.clearCookie('sa_session');
     return res.status(403).json({
       success: false,
-      message: 'Your account has been disabled. Please contact the administrator.'
+      message: 'Your account has been deactivated. Please contact the administrator.'
     });
   }
 
@@ -159,6 +123,7 @@ export async function requireAuth(req, res, next) {
 
   if (verified.admin || verified.email?.toLowerCase() === 'pothuri2455@gmail.com') {
     req.user.role = 'admin';
+    req.user.admin = true;
   }
 
   next();
@@ -173,7 +138,7 @@ export function requireAdmin(req, res, next) {
     if (!isRoleAdmin && !hasAdminClaim && !isMasterAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Overseer administrative clearance required.'
+        message: 'Access denied: Administrator clearance required.'
       });
     }
     next();
@@ -186,103 +151,23 @@ export function requireAdmin(req, res, next) {
 
 /**
  * POST /api/auth/login
- * One login endpoint for both Admin and User.
+ * DEPRECATED: All client authentication is performed directly via Firebase Authentication.
  */
 apiApp.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body || {};
-
-  if (!email || !email.trim() || !password) {
-    return res.status(400).json({ success: false, message: 'Please provide both email and password.' });
-  }
-
-  const clean = email.trim();
-  const user = db.findUserByEmail(clean) || db.findUserByUsername(clean);
-
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-  }
-
-  if (user.status === 'disabled') {
-    return res.status(403).json({
-      success: false,
-      message: 'Your account has been disabled. Please contact the administrator.'
-    });
-  }
-
-  const isPasswordValid = bcrypt.compareSync(password, user.passwordHash);
-  if (!isPasswordValid) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-  }
-
-  // Update last login
-  db.updateUser(user.id, { lastLoginAt: new Date().toISOString() });
-
-  // Issue secure JWT token
-  const token = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      displayName: user.displayName
-    },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  // Set secure HttpOnly cookie
-  res.cookie('sa_session', token, {
-    httpOnly: true,
-    secure: false, // True in production over HTTPS
-    sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
-
-  const { passwordHash: _, ...safeUser } = user;
-
-  return res.json({
-    success: true,
-    user: safeUser,
-    token
+  return res.status(410).json({
+    success: false,
+    message: 'Deprecated endpoint. Authentication must be performed directly using Firebase Authentication.'
   });
 });
 
 /**
  * POST /api/auth/register
- * Public player registration. Role is strictly locked to "user".
+ * DEPRECATED: Player registration is handled directly via Firebase Authentication client SDK.
  */
 apiApp.post('/api/auth/register', (req, res) => {
-  const { displayName, email, password } = req.body || {};
-
-  if (!displayName || !displayName.trim()) {
-    return res.status(400).json({ success: false, message: 'Please provide player name.' });
-  }
-  if (!email || !email.trim() || !email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
-  }
-  if (!password || password.length < 6) {
-    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
-  }
-
-  const cleanEmail = email.toLowerCase().trim();
-  const existing = db.findUserByEmail(cleanEmail);
-  if (existing) {
-    return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
-  }
-
-  const passwordHash = bcrypt.hashSync(password, 10);
-  const newUser = db.createUser({
-    displayName: displayName.trim(),
-    username: displayName.trim().toLowerCase().replace(/\s+/g, '_'),
-    email: cleanEmail,
-    passwordHash,
-    role: 'user', // STRICTLY USER FOR PUBLIC REGISTRATION
-    status: 'active'
-  });
-
-  return res.status(201).json({
-    success: true,
-    user: newUser,
-    message: 'Account created successfully! Please log in.'
+  return res.status(410).json({
+    success: false,
+    message: 'Deprecated endpoint. Registration must be performed directly using Firebase Authentication.'
   });
 });
 
@@ -306,29 +191,61 @@ apiApp.get('/api/auth/me', requireAuth, (req, res) => {
 
 /**
  * POST /api/auth/change-password
+ * Password management for Firebase users uses Firebase Authentication.
  */
-apiApp.post('/api/auth/change-password', requireAuth, (req, res) => {
-  const { currentPassword, newPassword } = req.body || {};
+apiApp.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  const { newPassword } = req.body || {};
 
-  if (!currentPassword || !newPassword || newPassword.length < 6) {
+  if (!newPassword || newPassword.length < 6) {
     return res.status(400).json({
       success: false,
       message: 'New password must be at least 6 characters.'
     });
   }
 
-  const fullUser = db.findUserById(req.user.id);
-  const isValid = bcrypt.compareSync(currentPassword, fullUser.passwordHash);
+  try {
+    await adminAuth.updateUser(req.user.uid || req.user.id, { password: newPassword });
+    return res.json({ success: true, message: 'Password changed successfully in Firebase Authentication.' });
+  } catch (err) {
+    console.warn('[Firebase Auth] Password update warning:', err.message);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update password.' });
+  }
+});
 
-  if (!isValid) {
-    return res.status(401).json({ success: false, message: 'Incorrect current password.' });
+// =============================================================
+// AUDIT LOG HELPER
+// Writes to Firestore adminAuditLogs collection and local store
+// =============================================================
+export async function recordAuditLog({ adminId, action, targetUserId, oldRole, newRole, details = {} }) {
+  const logEntry = {
+    adminId: adminId || 'admin',
+    action,
+    targetUserId,
+    timestamp: new Date().toISOString(),
+    ...(oldRole ? { oldRole } : {}),
+    ...(newRole ? { newRole } : {}),
+    ...details
+  };
+
+  try {
+    await adminDb.collection('adminAuditLogs').add({
+      adminId: logEntry.adminId,
+      action: logEntry.action,
+      targetUserId: logEntry.targetUserId,
+      ...(oldRole ? { oldRole } : {}),
+      ...(newRole ? { newRole } : {}),
+      timestamp: FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    // Non-blocking if Firestore API is deferred
   }
 
-  const newHash = bcrypt.hashSync(newPassword, 10);
-  db.updateUser(req.user.id, { passwordHash: newHash });
+  try {
+    db.addAuditLog(logEntry);
+  } catch (e) {}
 
-  return res.json({ success: true, message: 'Password changed successfully.' });
-});
+  return logEntry;
+}
 
 // =============================================================
 // 2. ADMIN USER MANAGEMENT ROUTES (/api/admin/users/*)
@@ -336,18 +253,90 @@ apiApp.post('/api/auth/change-password', requireAuth, (req, res) => {
 
 /**
  * GET /api/admin/users
+ * Returns authoritative user list from Firebase Auth, Firestore, and DB store
  */
-apiApp.get('/api/admin/users', requireAdmin, (req, res) => {
+apiApp.get('/api/admin/users', requireAdmin, async (req, res) => {
   const users = db.getAllUsers();
+  try {
+    // 1. Fetch Firebase Auth users
+    let authUsers = [];
+    try {
+      const listResult = await adminAuth.listUsers(100);
+      authUsers = listResult.users.map((u) => {
+        const isMaster = u.email?.toLowerCase() === 'pothuri2455@gmail.com';
+        const hasAdminClaim = Boolean(u.customClaims?.admin);
+        const role = (hasAdminClaim || isMaster) ? 'admin' : 'user';
+        return {
+          id: u.uid,
+          uid: u.uid,
+          displayName: u.displayName || (role === 'admin' ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
+          email: u.email || '',
+          role,
+          status: u.disabled ? 'inactive' : 'active',
+          createdAt: u.metadata?.creationTime || new Date().toISOString()
+        };
+      });
+    } catch (e) {
+      console.warn('[Admin API] listUsers error:', e.message);
+    }
+
+    // 2. Fetch Firestore users collection if available
+    let firestoreUsers = [];
+    try {
+      const snap = await adminDb.collection('users').get();
+      snap.forEach((docSnap) => {
+        const d = docSnap.data();
+        firestoreUsers.push({
+          id: docSnap.id,
+          uid: docSnap.id,
+          displayName: d.displayName || 'AWAKENED HUNTER',
+          email: d.email || '',
+          role: d.role || 'user',
+          status: d.status || 'active',
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt || new Date().toISOString()
+        });
+      });
+    } catch (err) {
+      // Non-blocking if Firestore API is deferred
+    }
+
+    // Merge: Auth Users + Firestore Users + DB Users
+    const seen = new Set();
+    const merged = [];
+
+    for (const u of authUsers) {
+      seen.add(u.id);
+      if (u.email) seen.add(u.email.toLowerCase());
+      merged.push(u);
+    }
+
+    for (const u of firestoreUsers) {
+      if (!seen.has(u.id) && (!u.email || !seen.has(u.email.toLowerCase()))) {
+        seen.add(u.id);
+        if (u.email) seen.add(u.email.toLowerCase());
+        merged.push(u);
+      }
+    }
+
+    for (const u of users) {
+      if (!seen.has(u.id) && (!u.email || !seen.has(u.email.toLowerCase()))) {
+        merged.push(u);
+      }
+    }
+
+    return res.json({ success: true, users: merged });
+  } catch (err) {
+    console.warn('[Admin API] Firestore users fetch notice:', err.message);
+  }
   return res.json({ success: true, users });
 });
 
 /**
  * POST /api/admin/users
  * Admin creates user accounts.
- * Role is strictly locked to "user" (cannot create another admin here).
+ * Role is strictly locked to "user" (cannot create another admin directly here).
  */
-apiApp.post('/api/admin/users', requireAdmin, (req, res) => {
+apiApp.post('/api/admin/users', requireAdmin, async (req, res) => {
   const { displayName, email, password, username } = req.body || {};
 
   if (!displayName || !displayName.trim()) {
@@ -366,12 +355,44 @@ apiApp.post('/api/admin/users', requireAdmin, (req, res) => {
     return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
   }
 
-  const passwordHash = bcrypt.hashSync(password, 10);
+  let createdUid = null;
+
+  // Create user in Firebase Authentication via Firebase Admin SDK
+  try {
+    const fbUserRecord = await adminAuth.createUser({
+      email: cleanEmail,
+      password,
+      displayName: displayName.trim()
+    });
+    createdUid = fbUserRecord.uid;
+    await adminAuth.setCustomUserClaims(createdUid, { admin: false });
+
+    // Create document in Firestore users/{uid}
+    try {
+      await adminDb.collection('users').doc(createdUid).set({
+        uid: createdUid,
+        email: cleanEmail,
+        displayName: displayName.trim(),
+        role: 'user',
+        status: 'active',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } catch (fsErr) {
+      // Non-blocking
+    }
+  } catch (err) {
+    console.warn('[Admin API] Firebase Auth user creation notice:', err.message);
+    if (err.code === 'auth/email-already-exists') {
+      return res.status(409).json({ success: false, message: 'An account with this email already exists in Firebase.' });
+    }
+  }
+
   const newUser = db.createUser({
+    id: createdUid,
     displayName: displayName.trim(),
     username: username || displayName.trim().toLowerCase().replace(/\s+/g, '_'),
     email: cleanEmail,
-    passwordHash,
     role: 'user', // STRICTLY USER
     status: 'active'
   });
@@ -386,8 +407,48 @@ apiApp.post('/api/admin/users', requireAdmin, (req, res) => {
 /**
  * GET /api/admin/users/:id
  */
-apiApp.get('/api/admin/users/:id', requireAdmin, (req, res) => {
-  const user = db.findUserById(req.params.id);
+apiApp.get('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  let user = db.findUserById(req.params.id) || db.findUserByEmail(req.params.id);
+
+  // If user not in local store, fetch from Firebase Auth
+  if (!user) {
+    try {
+      const fbUser = await adminAuth.getUser(req.params.id);
+      const isMasterAdmin = fbUser.email?.toLowerCase() === 'pothuri2455@gmail.com';
+      const hasAdmin = Boolean(fbUser.customClaims?.admin);
+      user = {
+        id: fbUser.uid,
+        uid: fbUser.uid,
+        displayName: fbUser.displayName || (hasAdmin || isMasterAdmin ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
+        email: fbUser.email || '',
+        role: (hasAdmin || isMasterAdmin) ? 'admin' : 'user',
+        status: fbUser.disabled ? 'inactive' : 'active',
+        createdAt: fbUser.metadata?.creationTime || new Date().toISOString(),
+        lastLoginAt: fbUser.metadata?.lastSignInTime || null
+      };
+    } catch (e) {}
+  }
+
+  // Fetch from Firestore users collection
+  if (!user) {
+    try {
+      const docSnap = await adminDb.collection('users').doc(req.params.id).get();
+      if (docSnap.exists) {
+        const d = docSnap.data();
+        user = {
+          id: req.params.id,
+          uid: req.params.id,
+          displayName: d.displayName || 'AWAKENED HUNTER',
+          email: d.email || '',
+          role: d.role || 'user',
+          status: d.status || 'active',
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt || new Date().toISOString(),
+          lastLoginAt: d.lastLoginAt || null
+        };
+      }
+    } catch (e) {}
+  }
+
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found.' });
   }
@@ -420,41 +481,31 @@ apiApp.get('/api/admin/users/:id', requireAdmin, (req, res) => {
   });
 });
 
-// -------------------------------------------------------------
-// AUDIT LOG HELPER
-// Writes to Firestore adminAuditLogs collection and local store
-// -------------------------------------------------------------
-export async function recordAuditLog({ adminId, action, targetUserId, oldRole, newRole, details = {} }) {
-  const logEntry = {
-    adminId: adminId || 'admin',
-    action,
-    targetUserId,
-    timestamp: new Date().toISOString(),
-    ...(oldRole ? { oldRole } : {}),
-    ...(newRole ? { newRole } : {}),
-    ...details
-  };
+/**
+ * Helper to count remaining active administrators across Auth and DB
+ */
+async function countOtherActiveAdmins(targetId, targetEmail) {
+  let allAdmins = db.getAllUsers().filter(
+    (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') && u.status === 'active'
+  );
 
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      await fbAdmin.firestore().collection('adminAuditLogs').add({
-        adminId: logEntry.adminId,
-        action: logEntry.action,
-        targetUserId: logEntry.targetUserId,
-        ...(oldRole ? { oldRole } : {}),
-        ...(newRole ? { newRole } : {}),
-        timestamp: fbAdmin.firestore.FieldValue.serverTimestamp()
-      });
+    const listRes = await adminAuth.listUsers(100);
+    const authAdmins = listRes.users.filter(
+      (u) => !u.disabled && (u.customClaims?.admin === true || u.email?.toLowerCase() === 'pothuri2455@gmail.com')
+    );
+    for (const a of authAdmins) {
+      if (!allAdmins.some((u) => u.id === a.uid || u.email?.toLowerCase() === a.email?.toLowerCase())) {
+        allAdmins.push({ id: a.uid, email: a.email, role: 'admin', status: 'active' });
+      }
     }
-  } catch (err) {
-    console.warn('[Audit Log] Firestore write notice:', err.message);
-  }
-
-  try {
-    db.addAuditLog(logEntry);
   } catch (e) {}
 
-  return logEntry;
+  const otherActiveAdmins = allAdmins.filter(
+    (u) => u.id !== targetId && u.email?.toLowerCase() !== targetEmail?.toLowerCase()
+  );
+
+  return otherActiveAdmins.length;
 }
 
 /**
@@ -468,22 +519,15 @@ apiApp.patch('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
   }
 
   const user = db.findUserById(req.params.id) || db.findUserByEmail(req.params.id);
-  if (!user) {
-    return res.status(404).json({ success: false, message: 'User not found.' });
-  }
+  const targetId = user?.id || req.params.id;
+  const targetEmail = user?.email;
 
   // Safety rule: The final active administrator cannot be demoted or deactivated
   // unless another active administrator exists.
-  const isTargetAdmin = user.role === 'admin' || user.email?.toLowerCase() === 'pothuri2455@gmail.com';
+  const isTargetAdmin = user?.role === 'admin' || targetEmail?.toLowerCase() === 'pothuri2455@gmail.com';
   if (isTargetAdmin && normalized !== 'active') {
-    const allUsers = db.getAllUsers();
-    const otherActiveAdmins = allUsers.filter(
-      (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
-             u.id !== user.id &&
-             u.email !== user.email &&
-             u.status === 'active'
-    );
-    if (otherActiveAdmins.length === 0) {
+    const otherCount = await countOtherActiveAdmins(targetId, targetEmail);
+    if (otherCount === 0) {
       return res.status(400).json({
         success: false,
         message: 'At least one active administrator must remain.'
@@ -491,25 +535,28 @@ apiApp.patch('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
     }
   }
 
-  const updated = db.updateUser(user.id, { status: normalized });
+  // Update in Firebase Auth
+  try {
+    await adminAuth.updateUser(targetId, { disabled: normalized !== 'active' });
+  } catch (e) {}
 
   // Update in Firestore
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      await fbAdmin.firestore().collection('users').doc(user.id).set({
-        status: normalized,
-        updatedAt: fbAdmin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    }
+    await adminDb.collection('users').doc(targetId).set({
+      status: normalized,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
   } catch (e) {
     console.warn('[Firestore] User status update notice:', e.message);
   }
+
+  const updated = user ? db.updateUser(user.id, { status: normalized }) : { id: targetId, status: normalized };
 
   // Record audit log
   await recordAuditLog({
     adminId: req.user.id || req.user.uid,
     action: normalized === 'active' ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
-    targetUserId: user.id
+    targetUserId: targetId
   });
 
   return res.json({
@@ -522,7 +569,7 @@ apiApp.patch('/api/admin/users/:id/status', requireAdmin, async (req, res) => {
 /**
  * PATCH /api/admin/users/:id/role
  * Admin changes user role: USER -> ADMIN or ADMIN -> USER.
- * Updates Firestore profile & Firebase Auth Custom Claim (admin: true/false).
+ * Authoritative: Updates Firestore profile & Firebase Auth Custom Claim (admin: true/false).
  */
 apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
   const { role } = req.body || {};
@@ -533,20 +580,15 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
   const targetId = req.params.id;
   let targetUser = db.findUserById(targetId) || db.findUserByEmail(targetId);
   const oldRole = targetUser?.role || 'user';
+  const targetEmail = targetUser?.email;
 
   // Safety rule: The final active administrator cannot be demoted or deactivated
   // unless another active administrator exists.
-  const allUsers = db.getAllUsers();
-  const isTargetAdmin = targetUser?.role === 'admin' || targetUser?.email?.toLowerCase() === 'pothuri2455@gmail.com';
+  const isTargetAdmin = targetUser?.role === 'admin' || targetEmail?.toLowerCase() === 'pothuri2455@gmail.com';
 
   if (isTargetAdmin && role !== 'admin') {
-    const otherActiveAdmins = allUsers.filter(
-      (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
-             u.id !== targetId &&
-             u.email !== targetUser?.email &&
-             u.status === 'active'
-    );
-    if (otherActiveAdmins.length === 0) {
+    const otherCount = await countOtherActiveAdmins(targetId, targetEmail);
+    if (otherCount === 0) {
       return res.status(400).json({
         success: false,
         message: 'At least one active administrator must remain.'
@@ -556,22 +598,19 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
 
   // 1. Update Firebase Custom Claims (admin: true / false) via Firebase Admin SDK
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      await fbAdmin.auth().setCustomUserClaims(targetId, { admin: role === 'admin' });
-      console.log(`[Firebase Admin] Custom claim updated for ${targetId}: admin=${role === 'admin'}`);
-    }
+    await adminAuth.setCustomUserClaims(targetId, { admin: role === 'admin' });
+    console.log(`[Firebase Admin] Custom claim updated for ${targetId}: admin=${role === 'admin'}`);
   } catch (err) {
     console.warn('[Firebase Admin] Custom claim update notice:', err.message);
   }
 
   // 2. Update Firestore profile users/{id}
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      await fbAdmin.firestore().collection('users').doc(targetId).set({
-        role,
-        updatedAt: fbAdmin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    }
+    await adminDb.collection('users').doc(targetId).set({
+      role,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    console.log(`[Firestore] Profile role updated for ${targetId}: role=${role}`);
   } catch (err) {
     console.warn('[Firebase Admin] Firestore profile update notice:', err.message);
   }
@@ -589,7 +628,7 @@ apiApp.patch('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
     });
   }
 
-  // Record audit log
+  // 4. Record audit log
   await recordAuditLog({
     adminId: req.user.id || req.user.uid,
     action: 'ROLE_CHANGED',
@@ -621,20 +660,12 @@ apiApp.post('/api/admin/users/:id/reset-password', requireAdmin, async (req, res
     return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
   }
 
-  // Use Firebase Admin SDK if active
+  // Use Firebase Admin SDK
   try {
-    if (fbAdmin.apps && fbAdmin.apps.length > 0) {
-      await fbAdmin.auth().updateUser(targetId, { password: newPassword });
-      console.log(`[Firebase Admin] Password updated for UID: ${targetId}`);
-    }
+    await adminAuth.updateUser(targetId, { password: newPassword });
+    console.log(`[Firebase Admin] Password updated for UID: ${targetId}`);
   } catch (err) {
     console.warn('[Firebase Admin] Password reset notice:', err.message);
-  }
-
-  // Update in DB without exposing plaintext permanently
-  if (user) {
-    const passwordHash = bcrypt.hashSync(newPassword, 10);
-    db.updateUser(user.id, { passwordHash });
   }
 
   // Record audit log
@@ -683,8 +714,14 @@ apiApp.post('/api/admin/monsters', requireAdmin, (req, res) => {
   return res.json({ success: true, monster });
 });
 
-apiApp.delete('/api/admin/monsters/:id', requireAdmin, (req, res) => {
+apiApp.delete('/api/admin/monsters/:id', requireAdmin, async (req, res) => {
   db.deleteMonster(req.params.id);
+  await recordAuditLog({
+    adminId: req.user.uid,
+    action: 'MONSTER_DELETED',
+    targetUserId: req.params.id,
+    details: { monsterId: req.params.id }
+  });
   return res.json({ success: true });
 });
 
@@ -701,6 +738,17 @@ apiApp.post('/api/admin/shadows', requireAdmin, (req, res) => {
   return res.json({ success: true, shadow });
 });
 
+apiApp.delete('/api/admin/shadows/:id', requireAdmin, async (req, res) => {
+  db.deleteShadowDefinition(req.params.id);
+  await recordAuditLog({
+    adminId: req.user.uid,
+    action: 'SHADOW_DELETED',
+    targetUserId: req.params.id,
+    details: { shadowId: req.params.id }
+  });
+  return res.json({ success: true });
+});
+
 apiApp.get('/api/admin/quests', requireAdmin, (req, res) => {
   return res.json({ success: true, quests: db.getQuests() });
 });
@@ -714,6 +762,17 @@ apiApp.post('/api/admin/quests', requireAdmin, (req, res) => {
   return res.json({ success: true, quest });
 });
 
+apiApp.delete('/api/admin/quests/:id', requireAdmin, async (req, res) => {
+  db.deleteQuest(req.params.id);
+  await recordAuditLog({
+    adminId: req.user.uid,
+    action: 'QUEST_DELETED',
+    targetUserId: req.params.id,
+    details: { questId: req.params.id }
+  });
+  return res.json({ success: true });
+});
+
 apiApp.get('/api/admin/dungeons', requireAdmin, (req, res) => {
   return res.json({ success: true, dungeons: db.getDungeons() });
 });
@@ -725,6 +784,17 @@ apiApp.post('/api/admin/dungeons', requireAdmin, (req, res) => {
   }
   db.saveDungeon(dungeon);
   return res.json({ success: true, dungeon });
+});
+
+apiApp.delete('/api/admin/dungeons/:id', requireAdmin, async (req, res) => {
+  db.deleteDungeon(req.params.id);
+  await recordAuditLog({
+    adminId: req.user.uid,
+    action: 'DUNGEON_DELETED',
+    targetUserId: req.params.id,
+    details: { dungeonId: req.params.id }
+  });
+  return res.json({ success: true });
 });
 
 apiApp.get('/api/admin/settings', requireAdmin, (req, res) => {

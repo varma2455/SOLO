@@ -236,12 +236,12 @@ export const AdminUserProfile = () => {
               {tempPassword}
             </div>
             <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 6 }}>
-              Provide this temporary password to the user. It is securely hashed on the server.
+              Provide this temporary password to the user. Passwords are managed directly via Firebase Authentication.
             </div>
           </div>
         )}
 
-        {/* Section 1: PLAYER PROFILE */}
+        {/* Section 1: USER DETAILS */}
         <div
           className="glass-panel"
           style={{
@@ -252,6 +252,12 @@ export const AdminUserProfile = () => {
             marginBottom: 24
           }}
         >
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ fontFamily: 'var(--font-cinzel)', fontSize: 16, fontWeight: 900, color: '#f87171', letterSpacing: '2px', textTransform: 'uppercase', margin: 0 }}>
+              USER DETAILS
+            </h2>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div
@@ -273,7 +279,7 @@ export const AdminUserProfile = () => {
                   {user.displayName}
                 </h1>
                 <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>{user.email}</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>User ID: {user.id}</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Firebase UID: {user.uid || user.id}</div>
               </div>
             </div>
 
@@ -295,7 +301,7 @@ export const AdminUserProfile = () => {
                     letterSpacing: '1px'
                   }}
                 >
-                  {user.role === 'admin' ? 'ROLE: ADMIN → USER' : 'ROLE: USER → ADMIN'}
+                  {user.role === 'admin' ? 'DEMOTE TO USER' : 'PROMOTE TO ADMIN'}
                 </button>
               )}
 
@@ -314,7 +320,7 @@ export const AdminUserProfile = () => {
                     letterSpacing: '1px'
                   }}
                 >
-                  {user.status === 'active' ? 'DISABLE USER' : 'ENABLE USER'}
+                  {user.status === 'active' ? 'DEACTIVATE USER' : 'ACTIVATE USER'}
                 </button>
               )}
 
@@ -347,14 +353,21 @@ export const AdminUserProfile = () => {
           {/* Account Attributes Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <div style={{ padding: 14, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>FIREBASE UID</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                {user.uid || user.id}
+              </div>
+            </div>
+
+            <div style={{ padding: 14, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>ROLE</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#c084fc', marginTop: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: user.role === 'admin' ? '#f87171' : '#c084fc', marginTop: 4 }}>
                 {user.role ? user.role.toUpperCase() : 'USER'}
               </div>
             </div>
 
             <div style={{ padding: 14, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>ACCOUNT STATUS</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>STATUS / ACCOUNT STATUS</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: user.status === 'active' ? '#4ade80' : '#f87171', marginTop: 4 }}>
                 {user.status ? user.status.toUpperCase() : 'ACTIVE'}
               </div>

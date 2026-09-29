@@ -7,7 +7,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -259,19 +258,14 @@ function loadDatabase() {
     }
   }
 
-  // Ensure initial administrator account exists securely
-  const hasAdmin = Object.values(dbState.users).some((u) => u.role === 'admin');
-  if (!hasAdmin) {
-    const adminId = 'admin_overseer';
-    const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync('AdminPass2026!', salt);
-
+  // Ensure initial administrator account exists securely (Never stores passwords)
+  if (!dbState.users['admin_pothuri']) {
+    const adminId = 'admin_pothuri';
     dbState.users[adminId] = {
       id: adminId,
-      username: 'admin',
-      displayName: 'SYSTEM OVERSEER',
-      email: 'admin@shadowascension.com',
-      passwordHash,
+      username: 'pothuri2455',
+      displayName: 'Shadow Ascension Admin',
+      email: 'pothuri2455@gmail.com',
       role: 'admin',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -279,7 +273,7 @@ function loadDatabase() {
     };
 
     saveDatabase(dbState);
-    console.log('[DB Engine] Provisioned initial Administrator account: admin@shadowascension.com');
+    console.log('[DB Engine] Provisioned initial Administrator profile: pothuri2455@gmail.com');
   }
 
   return dbState;
@@ -320,14 +314,13 @@ export const db = {
 
   getAllUsers() {
     return Object.values(dbInstance.users).map((u) => {
-      // NEVER return passwordHash to caller
-      const { passwordHash, ...safeUser } = u;
+      const { passwordHash: _, ...safeUser } = u;
       return safeUser;
     });
   },
 
-  createUser({ username, displayName, email, passwordHash, role = 'user', status = 'active' }) {
-    const id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  createUser({ id: customId, username, displayName, email, role = 'user', status = 'active' }) {
+    const id = customId || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
     const newUser = {
@@ -335,7 +328,6 @@ export const db = {
       username: (username || displayName || 'hunter').toLowerCase().trim(),
       displayName: displayName?.trim() || 'AWAKENED HUNTER',
       email: email.toLowerCase().trim(),
-      passwordHash,
       role: role === 'admin' ? 'admin' : 'user', // Enforce role
       status: status || 'active',
       createdAt: now,
@@ -396,14 +388,15 @@ export const db = {
     if (!dbInstance.users[id]) return null;
     const current = dbInstance.users[id];
 
-    // Disallow overriding id or role if not allowed
+    // Disallow overriding id
     const safeUpdates = { ...updates };
     delete safeUpdates.id;
+    delete safeUpdates.passwordHash;
 
     dbInstance.users[id] = { ...current, ...safeUpdates };
     saveDatabase();
 
-    const { passwordHash, ...safeUser } = dbInstance.users[id];
+    const { passwordHash: _, ...safeUser } = dbInstance.users[id];
     return safeUser;
   },
 
@@ -561,6 +554,12 @@ export const db = {
     return definition;
   },
 
+  deleteShadowDefinition(id) {
+    dbInstance.shadowDefinitions = (dbInstance.shadowDefinitions || []).filter((s) => s.id !== id);
+    saveDatabase();
+    return true;
+  },
+
   getQuests() {
     return dbInstance.quests || [];
   },
@@ -578,6 +577,12 @@ export const db = {
     return questData;
   },
 
+  deleteQuest(id) {
+    dbInstance.quests = (dbInstance.quests || []).filter((q) => q.id !== id);
+    saveDatabase();
+    return true;
+  },
+
   getDungeons() {
     return dbInstance.dungeons || DEFAULT_DUNGEONS;
   },
@@ -593,6 +598,12 @@ export const db = {
     dbInstance.dungeons = list;
     saveDatabase();
     return dungeonData;
+  },
+
+  deleteDungeon(id) {
+    dbInstance.dungeons = (dbInstance.dungeons || []).filter((d) => d.id !== id);
+    saveDatabase();
+    return true;
   },
 
   getSettings() {

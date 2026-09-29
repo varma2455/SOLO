@@ -20,9 +20,11 @@ app.use(apiApp);
 // In production, serve static frontend assets from dist/
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(DIST_DIR));
-  app.get('*', (req, res) => {
+  app.use((req, res) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.resolve(DIST_DIR, 'index.html'));
+    } else {
+      res.status(404).json({ success: false, message: 'Endpoint not found.' });
     }
   });
 }

@@ -55,39 +55,52 @@ export function withTimeout(promise, ms = 2000, fallbackVal = null) {
 
 /**
  * Checks if a Firebase Auth user has administrator rights.
- * Enforces real backend verification via Firestore 'admins/{uid}'
- * or recognized overseer credentials.
+ * Enforces real verification via Custom Claims, Firestore users/{uid} profile,
+ * or designated initial master administrator credentials.
  */
 export async function verifyAdminStatus(user) {
   if (!user || !user.uid) return false;
 
   const email = (user.email || '').toLowerCase().trim();
-  const isAuthorizedEmail =
-    email === 'yeswanthvarma684280@gmail.com' ||
-    email.startsWith('admin') ||
-    email.includes('admin');
+  const isMasterAdmin = email === 'shadow.admin@shadowascension.com' || email === 'pothuri2455@gmail.com';
 
+  // 1. Check custom claim (authoritative)
   try {
-    const adminDocRef = doc(db, 'admins', user.uid);
-    const snap = await withTimeout(getDoc(adminDocRef), 1800, null);
+    if (typeof user.getIdTokenResult === 'function') {
+      const tokenResult = await user.getIdTokenResult();
+      if (tokenResult?.claims?.admin === true) {
+        return true;
+      }
+    }
+  } catch (claimErr) {
+    // Non-blocking
+  }
 
-    if (snap && snap.exists && snap.exists() && snap.data()?.isAdmin === true) {
-      return true;
+  // 2. Check Firestore users/{uid}
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
+    const snap = await withTimeout(getDoc(userDocRef), 1800, null);
+
+    if (snap && snap.exists && snap.exists()) {
+      const data = snap.data();
+      if (data?.role === 'admin') {
+        return true;
+      }
     }
 
-    // Auto-provision initial verified admin document for designated overseers
-    if (isAuthorizedEmail) {
+    // Auto-provision initial verified admin document for designated master overseer
+    if (isMasterAdmin) {
       withTimeout(
         setDoc(
-          adminDocRef,
+          userDocRef,
           {
             uid: user.uid,
             email: user.email,
-            isAdmin: true,
+            displayName: 'Shadow Ascension Admin',
             role: 'admin',
-            clearance: 'OVERSEER',
+            status: 'active',
             createdAt: serverTimestamp(),
-            lastLogin: serverTimestamp()
+            updatedAt: serverTimestamp()
           },
           { merge: true }
         ),
@@ -100,7 +113,7 @@ export async function verifyAdminStatus(user) {
     return false;
   } catch (err) {
     console.warn('Firestore admin verification fallback check:', err?.message || err);
-    return isAuthorizedEmail;
+    return isMasterAdmin;
   }
 }
 

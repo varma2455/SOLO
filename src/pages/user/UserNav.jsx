@@ -14,11 +14,12 @@ import {
   Scroll,
   Settings,
   LogOut,
-  Swords
+  Swords,
+  Crown
 } from 'lucide-react';
 
 export const UserNav = () => {
-  const { user, logout } = useCustomAuth();
+  const { user, isAdmin, logout } = useCustomAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -146,12 +147,35 @@ export const UserNav = () => {
 
       {/* Hunter Info & Logout */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {isAdmin && (
+          <Link
+            id="nav-admin-panel-link"
+            to="/admin/dashboard"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 12px',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #ef4444',
+              borderRadius: 6,
+              color: '#f87171',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '1px',
+              textDecoration: 'none'
+            }}
+          >
+            <Crown size={13} />
+            <span>ADMIN PANEL</span>
+          </Link>
+        )}
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.8px' }}>
-            {user?.displayName || 'HUNTER'}
+            {user?.displayName || (isAdmin ? 'ADMINISTRATOR' : 'HUNTER')}
           </div>
-          <div style={{ fontSize: 10, color: '#10b981', fontWeight: 700, letterSpacing: '1px' }}>
-            ● ACTIVE HUNTER
+          <div style={{ fontSize: 10, color: isAdmin ? '#f87171' : '#10b981', fontWeight: 700, letterSpacing: '1px' }}>
+            ● {isAdmin ? 'OVERSEER ADMIN' : 'ACTIVE HUNTER'}
           </div>
         </div>
 

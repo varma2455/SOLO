@@ -1,6 +1,7 @@
 // -------------------------------------------------------------
 // SHADOW ASCENSION - MAIN APPLICATION ROUTING
 // Unified Authentication & Strict Role-Based Protected Routes
+// Multi-Page Admin Portal with Dedicated Nested Routes
 // -------------------------------------------------------------
 
 import React from 'react';
@@ -13,9 +14,20 @@ import { HomePage } from './pages/HomePage';
 import { UnifiedLoginPage } from './pages/UnifiedLoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { GameRoute } from './pages/GameRoute';
-import { AdminControlCenter } from './pages/AdminControlCenter';
-import { AdminUserProfile } from './pages/admin/AdminUserProfile';
 
+// Admin Modular Layout & Dedicated Page Components
+import { AdminLayout } from './admin/AdminLayout';
+import { AdminDashboard } from './admin/pages/AdminDashboard';
+import { AdminUsers } from './admin/pages/AdminUsers';
+import { AdminUserDetails } from './admin/pages/AdminUserDetails';
+import { AdminMonsters } from './admin/pages/AdminMonsters';
+import { AdminShadows } from './admin/pages/AdminShadows';
+import { AdminQuests } from './admin/pages/AdminQuests';
+import { AdminDungeons } from './admin/pages/AdminDungeons';
+import { AdminStatistics } from './admin/pages/AdminStatistics';
+import { AdminSettings } from './admin/pages/AdminSettings';
+
+// Hunter User Pages
 import { UserDashboard } from './pages/user/UserDashboard';
 import { UserProfile } from './pages/user/UserProfile';
 import { UserShadows } from './pages/user/UserShadows';
@@ -37,96 +49,28 @@ export const App = () => {
           <Route path="/admin/login" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
 
-          {/* Protected Administrator Routes */}
+          {/* Protected Multi-Page Overseer Admin Portal */}
           <Route
             path="/admin"
             element={
               <AdminRoute>
-                <Navigate to="/admin/dashboard" replace />
+                <AdminLayout />
               </AdminRoute>
             }
-          />
-          <Route
-            path="/admin/dashboard"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/users/:userId"
-            element={
-              <AdminRoute>
-                <AdminUserProfile />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/monsters"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/shadows"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/quests"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/dungeons"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/settings"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/statistics"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
-          {/* Admin tab catch-all */}
-          <Route
-            path="/admin/:tab"
-            element={
-              <AdminRoute>
-                <AdminControlCenter />
-              </AdminRoute>
-            }
-          />
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="users/:userId" element={<AdminUserDetails />} />
+            <Route path="monsters" element={<AdminMonsters />} />
+            <Route path="shadows" element={<AdminShadows />} />
+            <Route path="quests" element={<AdminQuests />} />
+            <Route path="dungeons" element={<AdminDungeons />} />
+            <Route path="statistics" element={<AdminStatistics />} />
+            <Route path="settings" element={<AdminSettings />} />
+            {/* Admin catch-all: redirects unknown admin sub-routes to dashboard */}
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
+          </Route>
 
           {/* Protected Hunter/User Routes */}
           <Route
@@ -198,7 +142,7 @@ export const App = () => {
           <Route path="/game" element={<GameRoute />} />
           <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
 
-          {/* Catch-all Fallback */}
+          {/* Global Catch-all Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

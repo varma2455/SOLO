@@ -1,31 +1,20 @@
 {
   "users": {
-    "admin_pothuri": {
-      "id": "admin_pothuri",
-      "username": "pothuri2455",
-      "displayName": "Game Administrator",
+    "YCQYAVkCh3RvWrOVT6ykVBaOePo1": {
+      "id": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "uid": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "displayName": "Shadow Ascension Admin",
       "email": "pothuri2455@gmail.com",
       "role": "admin",
       "status": "active",
-      "createdAt": "2026-09-27T13:50:00.000Z"
-    },
-    "admin_overseer": {
-      "id": "admin_overseer",
-      "username": "admin",
-      "displayName": "SYSTEM OVERSEER",
-      "email": "admin@shadowascension.com",
-      "passwordHash": "$2b$10$aiKFvdMzCg4Hz.Xbtfn36uuC4NDvdB8RWGESL1AZDY0/RkmRdwVme",
-      "role": "admin",
-      "status": "active",
-      "createdAt": "2026-09-27T13:10:49.796Z",
-      "lastLoginAt": "2026-09-28T02:38:05.430Z"
+      "createdAt": "2026-09-29T15:55:50.061Z",
+      "updatedAt": "2026-09-29T15:55:50.061Z"
     },
     "user_1790514681981_342vp": {
       "id": "user_1790514681981_342vp",
       "username": "yeswanth",
       "displayName": "YESWANTH",
       "email": "yeswanth@example.com",
-      "passwordHash": "$2b$10$bdxOg/7KCHQa7oyuh.uis.h0f8fmkzKpIb.1TcYoqDUSn.q0oYU2C",
       "role": "user",
       "status": "active",
       "createdAt": "2026-09-27T13:11:21.981Z",
@@ -36,7 +25,6 @@
       "username": "yeswanth",
       "displayName": "YESWANTH",
       "email": "yeswanth@shadowascension.io",
-      "passwordHash": "$2b$10$A/86FehUkEyIBjaxD7LfSO1F./PF14d4looLn9EupI4Lgb8S7BTRi",
       "role": "user",
       "status": "active",
       "createdAt": "2026-09-27T13:21:57.974Z",
@@ -47,7 +35,6 @@
       "username": "arjun",
       "displayName": "ARJUN",
       "email": "arjun@shadowascension.io",
-      "passwordHash": "$2b$10$sR1FcSv3EL1Eb9MwvYezxOwlQDeRttvFD8xdf8vrai8JOVZPRboye",
       "role": "user",
       "status": "active",
       "createdAt": "2026-09-27T13:25:08.902Z",
@@ -58,7 +45,6 @@
       "username": "sung_jinwoo",
       "displayName": "SUNG JINWOO",
       "email": "hunter_1790516463506@shadow.io",
-      "passwordHash": "$2b$10$30.uo0ujLFy.VnhZdoAGEOSmSG.TbW90VBf.5jVugYcyjSIfkog9m",
       "role": "user",
       "status": "active",
       "createdAt": "2026-09-27T13:41:03.935Z",
@@ -69,11 +55,140 @@
       "username": "sung_jinwoo",
       "displayName": "SUNG JINWOO",
       "email": "hunter_1790516539856@shadow.io",
-      "passwordHash": "$2b$10$9fcJXpy/QVJa6dOWbmcYauVVqSV0mIHhBC8NyDdFLi8rpDS75ykIa",
       "role": "user",
       "status": "active",
       "createdAt": "2026-09-27T13:42:20.324Z",
       "lastLoginAt": "2026-09-27T13:42:36.795Z"
+    },
+    "user_1790606354411_ra08e": {
+      "id": "user_1790606354411_ra08e",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790606354411@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T14:39:14.411Z",
+      "lastLoginAt": null
+    },
+    "user_1790606983333_buoxb": {
+      "id": "user_1790606983333_buoxb",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790606983333@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T14:49:43.333Z",
+      "lastLoginAt": null
+    },
+    "user_1790607532343_54oz0": {
+      "id": "user_1790607532343_54oz0",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790607532343@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T14:58:52.343Z",
+      "lastLoginAt": null
+    },
+    "user_1790607843119_ijn9h": {
+      "id": "user_1790607843119_ijn9h",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790607843119@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T15:04:03.119Z",
+      "lastLoginAt": null
+    },
+    "t6LkG9riW4UVLnYnhdelUpA0He83": {
+      "id": "t6LkG9riW4UVLnYnhdelUpA0He83",
+      "uid": "t6LkG9riW4UVLnYnhdelUpA0He83",
+      "displayName": "Shadow Ascension Admin",
+      "email": "shadow.admin@shadowascension.com",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T15:52:35.410Z",
+      "updatedAt": "2026-09-28T15:52:35.410Z"
+    },
+    "user_1790612074501_8xx8h": {
+      "id": "user_1790612074501_8xx8h",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790612074501@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-28T16:14:34.501Z",
+      "lastLoginAt": null
+    },
+    "9IHqNBh97vSQT4niYR4ZM0zXue92": {
+      "id": "9IHqNBh97vSQT4niYR4ZM0zXue92",
+      "username": "awakened initiate",
+      "displayName": "Awakened Initiate",
+      "email": "hunter_1790696436493@shadowascension.test",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T15:40:37.457Z",
+      "lastLoginAt": null
+    },
+    "admin_pothuri": {
+      "id": "admin_pothuri",
+      "username": "pothuri2455",
+      "displayName": "Shadow Ascension Admin",
+      "email": "pothuri2455@gmail.com",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2026-09-29T15:41:37.243Z",
+      "lastLoginAt": null
+    },
+    "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2": {
+      "id": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2",
+      "username": "awakened initiate",
+      "displayName": "Awakened Initiate",
+      "email": "hunter_1790696514332@shadowascension.test",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T15:41:55.242Z",
+      "lastLoginAt": null
+    },
+    "user_1790696550282_vjt5h": {
+      "id": "user_1790696550282_vjt5h",
+      "username": "test hunter kael",
+      "displayName": "Test Hunter Kael",
+      "email": "test_kael_1790696550282@shadowascension.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T15:42:30.282Z",
+      "lastLoginAt": null
+    },
+    "4OGkpcSo7hhzdLqmnPpSGmdzIb83": {
+      "id": "4OGkpcSo7hhzdLqmnPpSGmdzIb83",
+      "username": "awakened initiate",
+      "displayName": "Awakened Initiate",
+      "email": "hunter_1790696679371@shadowascension.test",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T15:44:40.452Z",
+      "lastLoginAt": null
+    },
+    "upRuXqNiibWDxNMpF10EStMcfWy1": {
+      "id": "upRuXqNiibWDxNMpF10EStMcfWy1",
+      "username": "awakened initiate",
+      "displayName": "Awakened Initiate",
+      "email": "hunter_1790697394961@shadowascension.test",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T15:56:36.021Z",
+      "lastLoginAt": null
+    },
+    "QCGHvgahufPXR0rh8Mh79Cf0v6P2": {
+      "id": "QCGHvgahufPXR0rh8Mh79Cf0v6P2",
+      "username": "hunter",
+      "displayName": "Hunter",
+      "email": "qcghvgahufpxr0rh8mh79cf0v6p2@shadow.io",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-09-29T19:44:21.984Z",
+      "lastLoginAt": null
     }
   },
   "playerProgress": {
@@ -439,6 +554,586 @@
       ],
       "rotation": 0,
       "updatedAt": "2026-09-28T02:37:35.911Z"
+    },
+    "user_1790606354411_ra08e": {
+      "userId": "user_1790606354411_ra08e",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T14:39:14.411Z"
+    },
+    "user_1790606983333_buoxb": {
+      "userId": "user_1790606983333_buoxb",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T14:49:43.333Z"
+    },
+    "user_1790607532343_54oz0": {
+      "userId": "user_1790607532343_54oz0",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T14:58:52.343Z"
+    },
+    "user_1790607843119_ijn9h": {
+      "userId": "user_1790607843119_ijn9h",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:04:03.119Z"
+    },
+    "ftBGQMYksRVyqQ392esabYf1GRg2": {
+      "userId": "ftBGQMYksRVyqQ392esabYf1GRg2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:08:54.103Z"
+    },
+    "lfuQLv8rschC9Zn6RJ5Fw9IymPW2": {
+      "userId": "lfuQLv8rschC9Zn6RJ5Fw9IymPW2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:10:57.336Z"
+    },
+    "1yZNW55jTkcpH80edrLzsPpZEq23": {
+      "userId": "1yZNW55jTkcpH80edrLzsPpZEq23",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:37:33.148Z"
+    },
+    "HwVNHeWJdXcXf2VLk4VoZER4avz1": {
+      "userId": "HwVNHeWJdXcXf2VLk4VoZER4avz1",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:48:45.130Z"
+    },
+    "PxmqRR1Vvga1A3JKTO00b7LFEoc2": {
+      "userId": "PxmqRR1Vvga1A3JKTO00b7LFEoc2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T15:51:57.858Z"
+    },
+    "FY4swf2R7fgqAhWjXzSFuSNLzCM2": {
+      "userId": "FY4swf2R7fgqAhWjXzSFuSNLzCM2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T16:14:02.873Z"
+    },
+    "user_1790612074501_8xx8h": {
+      "userId": "user_1790612074501_8xx8h",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-28T16:14:34.501Z"
+    },
+    "9IHqNBh97vSQT4niYR4ZM0zXue92": {
+      "userId": "9IHqNBh97vSQT4niYR4ZM0zXue92",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:40:37.457Z"
+    },
+    "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2": {
+      "userId": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:41:55.242Z"
+    },
+    "user_1790696550282_vjt5h": {
+      "userId": "user_1790696550282_vjt5h",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:42:30.282Z"
+    },
+    "hYdG1dicbAZtLZDFpwaDDWyTIcC2": {
+      "userId": "hYdG1dicbAZtLZDFpwaDDWyTIcC2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:43:30.468Z"
+    },
+    "4OGkpcSo7hhzdLqmnPpSGmdzIb83": {
+      "userId": "4OGkpcSo7hhzdLqmnPpSGmdzIb83",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:44:40.452Z"
+    },
+    "upRuXqNiibWDxNMpF10EStMcfWy1": {
+      "userId": "upRuXqNiibWDxNMpF10EStMcfWy1",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:56:36.021Z"
+    },
+    "DXGvzNuUybQ6Pc0BuVsb0JSBdq23": {
+      "userId": "DXGvzNuUybQ6Pc0BuVsb0JSBdq23",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T15:57:26.965Z"
+    },
+    "QCGHvgahufPXR0rh8Mh79Cf0v6P2": {
+      "userId": "QCGHvgahufPXR0rh8Mh79Cf0v6P2",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 560,
+      "maxHp": 560,
+      "mp": 270,
+      "maxMp": 270,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        0.5,
+        24
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T19:44:21.984Z"
+    },
+    "YCQYAVkCh3RvWrOVT6ykVBaOePo1": {
+      "userId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "level": 1,
+      "xp": 0,
+      "maxXp": 100,
+      "hp": 569.324900000001,
+      "maxHp": 770,
+      "mp": 316.6245000000111,
+      "maxMp": 390,
+      "gold": 100,
+      "shadowCores": 3,
+      "currentRoom": 1,
+      "monstersDefeated": 0,
+      "bossesDefeated": 0,
+      "dungeonsCompleted": 0,
+      "attributes": {
+        "strength": 10,
+        "agility": 10,
+        "intelligence": 10,
+        "vitality": 10
+      },
+      "position": [
+        0,
+        1,
+        8
+      ],
+      "rotation": 0,
+      "updatedAt": "2026-09-29T19:47:36.980Z"
     }
   },
   "playerShadows": {
@@ -460,7 +1155,132 @@
     "n85Lp8hFyVMPMLQFdQOIsPiTrKo2": [],
     "YIwsYqDeVKRQnzOSoeVvCryESdz1": [],
     "0GMMeN21ljVfRAXGUzfPQTmE4Cy2": [],
-    "kl2ctvy2zcQohmWyOgkCTHVRog33": []
+    "kl2ctvy2zcQohmWyOgkCTHVRog33": [],
+    "user_1790606354411_ra08e": [],
+    "user_1790606983333_buoxb": [],
+    "user_1790607532343_54oz0": [],
+    "user_1790607843119_ijn9h": [],
+    "ftBGQMYksRVyqQ392esabYf1GRg2": [],
+    "lfuQLv8rschC9Zn6RJ5Fw9IymPW2": [],
+    "1yZNW55jTkcpH80edrLzsPpZEq23": [],
+    "HwVNHeWJdXcXf2VLk4VoZER4avz1": [],
+    "PxmqRR1Vvga1A3JKTO00b7LFEoc2": [],
+    "FY4swf2R7fgqAhWjXzSFuSNLzCM2": [],
+    "user_1790612074501_8xx8h": [],
+    "9IHqNBh97vSQT4niYR4ZM0zXue92": [],
+    "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2": [],
+    "user_1790696550282_vjt5h": [],
+    "hYdG1dicbAZtLZDFpwaDDWyTIcC2": [],
+    "4OGkpcSo7hhzdLqmnPpSGmdzIb83": [],
+    "upRuXqNiibWDxNMpF10EStMcfWy1": [],
+    "DXGvzNuUybQ6Pc0BuVsb0JSBdq23": [],
+    "QCGHvgahufPXR0rh8Mh79Cf0v6P2": [],
+    "YCQYAVkCh3RvWrOVT6ykVBaOePo1": [
+      {
+        "id": "dusk_knight",
+        "name": "Dusk Knight",
+        "rank": "C",
+        "level": 1,
+        "exp": 0,
+        "maxExp": 100,
+        "role": "Melee Heavy Tank",
+        "hp": 1000,
+        "maxHp": 1000,
+        "mp": 500,
+        "maxMp": 500,
+        "attack": 60,
+        "defense": 25,
+        "speed": 4.8,
+        "attackRange": 2.4,
+        "attackCooldown": 1.2,
+        "scale": 1.15,
+        "color": "#030712",
+        "glowColor": "#38bdf8",
+        "unlocked": false,
+        "active": false,
+        "isDead": false,
+        "status": "UNSUMMONED",
+        "description": "A towering dark plate warrior forged from the soul of a fallen crypt guardian. Absorbs damage and crushes foes."
+      },
+      {
+        "id": "nightfang",
+        "name": "Nightfang",
+        "rank": "D",
+        "level": 1,
+        "exp": 0,
+        "maxExp": 100,
+        "role": "Agile Assassin",
+        "hp": 800,
+        "maxHp": 800,
+        "mp": 500,
+        "maxMp": 500,
+        "attack": 75,
+        "defense": 10,
+        "speed": 5.5,
+        "attackRange": 2,
+        "attackCooldown": 0.9,
+        "scale": 0.95,
+        "color": "#0f172a",
+        "glowColor": "#38bdf8",
+        "unlocked": false,
+        "active": false,
+        "isDead": false,
+        "status": "UNSUMMONED",
+        "description": "Extracted from a swift bone reaver. Moves with blistering speed to flank vulnerable enemies."
+      },
+      {
+        "id": "void_marksman",
+        "name": "Void Marksman",
+        "rank": "C",
+        "level": 1,
+        "exp": 0,
+        "maxExp": 100,
+        "role": "Ranged Sniper",
+        "hp": 750,
+        "maxHp": 750,
+        "mp": 500,
+        "maxMp": 500,
+        "attack": 70,
+        "defense": 8,
+        "speed": 4.2,
+        "attackRange": 12,
+        "attackCooldown": 1.8,
+        "scale": 1,
+        "color": "#1e1b4b",
+        "glowColor": "#c084fc",
+        "unlocked": false,
+        "active": false,
+        "isDead": false,
+        "status": "UNSUMMONED",
+        "description": "A shadow archer manifesting spectral dark arrows that strike from long range."
+      },
+      {
+        "id": "umbral_general",
+        "name": "Umbral General",
+        "rank": "A",
+        "level": 1,
+        "exp": 0,
+        "maxExp": 200,
+        "role": "Supreme Commander",
+        "hp": 1500,
+        "maxHp": 1500,
+        "mp": 500,
+        "maxMp": 500,
+        "attack": 110,
+        "defense": 45,
+        "speed": 4.2,
+        "attackRange": 3,
+        "attackCooldown": 1.4,
+        "scale": 1.5,
+        "color": "#000000",
+        "glowColor": "#a855f7",
+        "unlocked": false,
+        "active": false,
+        "isDead": false,
+        "status": "UNSUMMONED",
+        "description": "Extracted essence of the Abyss Warden. Radiates an imposing aura of pure dominance."
+      }
+    ]
   },
   "playerInventory": {
     "user_1790514681981_342vp": [
@@ -530,7 +1350,195 @@
     "n85Lp8hFyVMPMLQFdQOIsPiTrKo2": [],
     "YIwsYqDeVKRQnzOSoeVvCryESdz1": [],
     "0GMMeN21ljVfRAXGUzfPQTmE4Cy2": [],
-    "kl2ctvy2zcQohmWyOgkCTHVRog33": []
+    "kl2ctvy2zcQohmWyOgkCTHVRog33": [],
+    "user_1790606354411_ra08e": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "user_1790606983333_buoxb": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "user_1790607532343_54oz0": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "user_1790607843119_ijn9h": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "ftBGQMYksRVyqQ392esabYf1GRg2": [],
+    "lfuQLv8rschC9Zn6RJ5Fw9IymPW2": [],
+    "1yZNW55jTkcpH80edrLzsPpZEq23": [],
+    "HwVNHeWJdXcXf2VLk4VoZER4avz1": [],
+    "PxmqRR1Vvga1A3JKTO00b7LFEoc2": [],
+    "FY4swf2R7fgqAhWjXzSFuSNLzCM2": [],
+    "user_1790612074501_8xx8h": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "9IHqNBh97vSQT4niYR4ZM0zXue92": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "user_1790696550282_vjt5h": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "hYdG1dicbAZtLZDFpwaDDWyTIcC2": [],
+    "4OGkpcSo7hhzdLqmnPpSGmdzIb83": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "upRuXqNiibWDxNMpF10EStMcfWy1": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "DXGvzNuUybQ6Pc0BuVsb0JSBdq23": [],
+    "QCGHvgahufPXR0rh8Mh79Cf0v6P2": [
+      {
+        "id": "starting_iron_blade",
+        "name": "Initiate Iron Blade",
+        "category": "weapon",
+        "rarity": "common",
+        "icon": "⚔️",
+        "attack": 15,
+        "equipped": true,
+        "description": "Standard issue blade for awakened hunters."
+      }
+    ],
+    "YCQYAVkCh3RvWrOVT6ykVBaOePo1": [
+      {
+        "id": "wpn_hunter_dagger",
+        "name": "Initiate's Dagger",
+        "category": "weapon",
+        "rarity": "common",
+        "level": 1,
+        "attack": 8,
+        "critChance": 2,
+        "description": "Standard issue awakened hunter blade. Worn but reliable.",
+        "icon": "Sword"
+      },
+      {
+        "id": "arm_scout_tunic",
+        "name": "Scout Leather Garb",
+        "category": "armor",
+        "rarity": "common",
+        "level": 1,
+        "defense": 6,
+        "maxHp": 30,
+        "description": "Lightweight leather armor suitable for low-rank hunter missions.",
+        "icon": "Shield"
+      },
+      {
+        "id": "acc_abyss_amulet",
+        "name": "Heart of the Void Core",
+        "category": "accessory",
+        "rarity": "epic",
+        "level": 5,
+        "attack": 18,
+        "maxMana": 80,
+        "critDamage": 25,
+        "description": "An ancient talisman radiating with Ascension Core dark energy.",
+        "icon": "Flame",
+        "count": 3
+      },
+      {
+        "id": "con_hp_potion",
+        "name": "Elixir of Restoration",
+        "category": "consumable",
+        "rarity": "common",
+        "level": 1,
+        "healAmount": 120,
+        "description": "Restores 120 HP instantly.",
+        "icon": "Heart",
+        "count": 2
+      }
+    ]
   },
   "playerQuests": {
     "user_1790514681981_342vp": [
@@ -1494,6 +2502,1486 @@
         },
         "status": "active"
       }
+    ],
+    "user_1790606354411_ra08e": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "user_1790606983333_buoxb": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "user_1790607532343_54oz0": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "user_1790607843119_ijn9h": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "ftBGQMYksRVyqQ392esabYf1GRg2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "lfuQLv8rschC9Zn6RJ5Fw9IymPW2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "1yZNW55jTkcpH80edrLzsPpZEq23": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "HwVNHeWJdXcXf2VLk4VoZER4avz1": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "PxmqRR1Vvga1A3JKTO00b7LFEoc2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "FY4swf2R7fgqAhWjXzSFuSNLzCM2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "user_1790612074501_8xx8h": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "9IHqNBh97vSQT4niYR4ZM0zXue92": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "user_1790696550282_vjt5h": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "hYdG1dicbAZtLZDFpwaDDWyTIcC2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "4OGkpcSo7hhzdLqmnPpSGmdzIb83": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "upRuXqNiibWDxNMpF10EStMcfWy1": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "DXGvzNuUybQ6Pc0BuVsb0JSBdq23": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "QCGHvgahufPXR0rh8Mh79Cf0v6P2": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
+    ],
+    "YCQYAVkCh3RvWrOVT6ykVBaOePo1": [
+      {
+        "id": "main_awakening",
+        "title": "THE AWAKENING",
+        "type": "main",
+        "description": "Awaken your Ascension Core and purge the depths of the Forgotten Crypt.",
+        "objectives": [
+          {
+            "id": "defeat_monsters",
+            "text": "Enemies defeated",
+            "current": 0,
+            "target": 10
+          },
+          {
+            "id": "extract_shadow",
+            "text": "Extract a Shadow Soldier",
+            "current": 0,
+            "target": 1
+          },
+          {
+            "id": "defeat_boss",
+            "text": "Defeat Abyss Warden",
+            "current": 0,
+            "target": 1
+          }
+        ],
+        "rewards": {
+          "xp": 500,
+          "gold": 150,
+          "shadowCores": 3
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_crypt_cleansing",
+        "title": "DAILY: Crypt Cleansing",
+        "type": "daily",
+        "description": "Purge wandering husks to prevent dark miasma overflow.",
+        "objectives": [
+          {
+            "id": "defeat_15",
+            "text": "Defeat 15 monsters",
+            "current": 0,
+            "target": 15
+          }
+        ],
+        "rewards": {
+          "xp": 250,
+          "gold": 80,
+          "shadowCores": 2
+        },
+        "status": "active"
+      },
+      {
+        "id": "daily_shadow_monarch",
+        "title": "DAILY: Shadow Commander",
+        "type": "daily",
+        "description": "Exercise the power of your core by commanding Shadows in battle.",
+        "objectives": [
+          {
+            "id": "extract_shadows_2",
+            "text": "Extract 2 defeated enemies",
+            "current": 0,
+            "target": 2
+          }
+        ],
+        "rewards": {
+          "xp": 300,
+          "gold": 100,
+          "shadowCores": 3
+        },
+        "status": "active"
+      }
     ]
   },
   "monsters": [
@@ -1728,14 +4216,176 @@
     "difficulty": "Normal",
     "enemyDensity": 1,
     "bossScaling": 1,
-    "maintenanceMode": false,
-    "updatedAt": "2026-09-27T13:10:49.618Z",
-    "updatedBy": "System"
+    "maintenanceMode": true,
+    "updatedAt": "2026-09-29T19:47:19.113Z",
+    "updatedBy": "pothuri2455@gmail.com",
+    "registrationOpen": true,
+    "pvpEnabled": false,
+    "shadowExtractionBonus": 10,
+    "auditLoggingEnabled": true,
+    "sessionTimeoutMinutes": 60
   },
   "statistics": {
     "totalMonstersDefeated": 0,
     "totalBossesDefeated": 0,
     "totalDungeonsCompleted": 0,
-    "totalShadowsExtracted": 1
-  }
+    "totalShadowsExtracted": 5
+  },
+  "auditLogs": [
+    {
+      "id": "log_1790711092252_ggnk",
+      "timestamp": "2026-09-29T19:44:52.071Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "QCGHvgahufPXR0rh8Mh79Cf0v6P2",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790711062239_gprf",
+      "timestamp": "2026-09-29T19:44:21.986Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "QCGHvgahufPXR0rh8Mh79Cf0v6P2",
+      "oldRole": "user",
+      "newRole": "admin"
+    },
+    {
+      "id": "log_1790697404856_2oti",
+      "timestamp": "2026-09-29T15:56:44.780Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_ACTIVATED",
+      "targetUserId": "upRuXqNiibWDxNMpF10EStMcfWy1"
+    },
+    {
+      "id": "log_1790697403650_w08q",
+      "timestamp": "2026-09-29T15:56:43.562Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_DEACTIVATED",
+      "targetUserId": "upRuXqNiibWDxNMpF10EStMcfWy1"
+    },
+    {
+      "id": "log_1790697399671_ew39",
+      "timestamp": "2026-09-29T15:56:39.600Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "upRuXqNiibWDxNMpF10EStMcfWy1",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790697397984_tqog",
+      "timestamp": "2026-09-29T15:56:37.883Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "upRuXqNiibWDxNMpF10EStMcfWy1",
+      "oldRole": "user",
+      "newRole": "admin"
+    },
+    {
+      "id": "log_1790696688251_0mz9",
+      "timestamp": "2026-09-29T15:44:48.183Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_ACTIVATED",
+      "targetUserId": "4OGkpcSo7hhzdLqmnPpSGmdzIb83"
+    },
+    {
+      "id": "log_1790696687019_qklp",
+      "timestamp": "2026-09-29T15:44:46.931Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_DEACTIVATED",
+      "targetUserId": "4OGkpcSo7hhzdLqmnPpSGmdzIb83"
+    },
+    {
+      "id": "log_1790696684222_172r",
+      "timestamp": "2026-09-29T15:44:44.148Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "4OGkpcSo7hhzdLqmnPpSGmdzIb83",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790696682511_944p",
+      "timestamp": "2026-09-29T15:44:42.413Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "4OGkpcSo7hhzdLqmnPpSGmdzIb83",
+      "oldRole": "user",
+      "newRole": "admin"
+    },
+    {
+      "id": "log_1790696522767_7e7m",
+      "timestamp": "2026-09-29T15:42:02.647Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_ACTIVATED",
+      "targetUserId": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2"
+    },
+    {
+      "id": "log_1790696521558_1fal",
+      "timestamp": "2026-09-29T15:42:01.487Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_DEACTIVATED",
+      "targetUserId": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2"
+    },
+    {
+      "id": "log_1790696518896_r4o7",
+      "timestamp": "2026-09-29T15:41:58.827Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790696517232_n00x",
+      "timestamp": "2026-09-29T15:41:57.143Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "7lwNfXPGI8MIK7U7Ed1PzrIRcvC2",
+      "oldRole": "user",
+      "newRole": "admin"
+    },
+    {
+      "id": "log_1790696447051_y93t",
+      "timestamp": "2026-09-29T15:40:46.963Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_ACTIVATED",
+      "targetUserId": "9IHqNBh97vSQT4niYR4ZM0zXue92"
+    },
+    {
+      "id": "log_1790696445823_nrxi",
+      "timestamp": "2026-09-29T15:40:45.733Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "USER_DEACTIVATED",
+      "targetUserId": "9IHqNBh97vSQT4niYR4ZM0zXue92"
+    },
+    {
+      "id": "log_1790696444692_f89a",
+      "timestamp": "2026-09-29T15:40:44.586Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790696443251_do32",
+      "timestamp": "2026-09-29T15:40:43.155Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "9IHqNBh97vSQT4niYR4ZM0zXue92",
+      "oldRole": "admin",
+      "newRole": "user"
+    },
+    {
+      "id": "log_1790696439665_1wz1",
+      "timestamp": "2026-09-29T15:40:39.544Z",
+      "adminId": "YCQYAVkCh3RvWrOVT6ykVBaOePo1",
+      "action": "ROLE_CHANGED",
+      "targetUserId": "9IHqNBh97vSQT4niYR4ZM0zXue92",
+      "oldRole": "user",
+      "newRole": "admin"
+    }
+  ]
 }

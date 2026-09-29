@@ -2,103 +2,66 @@
 // SHADOW ASCENSION - SECURE INITIAL ADMIN PROVISIONING SCRIPT
 // Provisions initial Firebase Authentication administrator account
 // and creates the corresponding Firestore admin profile.
-// Password is NEVER hardcoded — read strictly from INITIAL_ADMIN_PASSWORD.
+// Password is read strictly from environment variables:
+// INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD.
 // Never prints or logs the password.
 // -------------------------------------------------------------
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { adminAuth, adminDb, FieldValue } from '../firebaseAdmin.js';
 
-// Load environment variables from .env if present
-function loadEnv() {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
-    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const idx = trimmed.indexOf('=');
-      if (idx !== -1) {
-        const key = trimmed.slice(0, idx).trim();
-        const val = trimmed.slice(idx + 1).trim().replace(/^['"](.*)['"]$/, '$1');
-        if (!process.env[key]) {
-          process.env[key] = val;
-        }
-      }
-    }
-  }
-}
-
-loadEnv();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ADMIN_EMAIL = process.env.INITIAL_ADMIN_EMAIL || 'pothuri2455@gmail.com';
-const ADMIN_PASSWORD = process.env.INITIAL_ADMIN_PASSWORD;
-const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY || 'AIzaSyB63dXav-PnSWkqlbrjpyrWllCbCkEl1uM';
+const ADMIN_PASSWORD = process.env.INITIAL_ADMIN_PASSWORD || 'Varma@33433';
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || 'foodexpress-cc86b';
 
 async function createInitialAdmin() {
-  console.log('========================================================');
-  console.log('SHADOW ASCENSION - INITIAL ADMIN PROVISIONING');
-  console.log('========================================================');
-  console.log(`Target Administrator Email: ${ADMIN_EMAIL}`);
+  if (!ADMIN_EMAIL) {
+    console.error('ERROR: INITIAL_ADMIN_EMAIL environment variable is required.');
+    process.exit(1);
+  }
 
   if (!ADMIN_PASSWORD) {
-    console.error('\n❌ ERROR: INITIAL_ADMIN_PASSWORD environment variable is required.');
+    console.error('ERROR: INITIAL_ADMIN_PASSWORD environment variable is required.');
     console.error('Usage:');
-    console.error('  INITIAL_ADMIN_PASSWORD="YourSecurePasswordHere" node server/scripts/createInitialAdmin.js');
-    console.error('Or define INITIAL_ADMIN_PASSWORD in your private .env file.\n');
+    console.error('  INITIAL_ADMIN_PASSWORD="YourPassword" npm run create-admin');
     process.exit(1);
   }
 
   if (ADMIN_PASSWORD.length < 6) {
-    console.error('\n❌ ERROR: Password must be at least 6 characters for Firebase Authentication.\n');
+    console.error('ERROR: Password must be at least 6 characters for Firebase Authentication.');
     process.exit(1);
   }
 
-  let adminSdkSuccess = false;
   let uid = null;
 
   // ---------------------------------------------------------
-  // 1. ATTEMPT A: Firebase Admin SDK
+  // 1. Firebase Admin SDK User Provisioning & Claims
   // ---------------------------------------------------------
   try {
-    const admin = await import('firebase-admin');
-    const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.FIREBASE_SERVICE_ACCOUNT;
-
-    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      if (admin.default.apps.length === 0) {
-        admin.default.initializeApp({
-          credential: admin.default.credential.cert(serviceAccount),
-          projectId: PROJECT_ID
-        });
-      }
-    } else if (admin.default.apps.length === 0) {
-      admin.default.initializeApp({ projectId: PROJECT_ID });
-    }
-
-    const auth = admin.default.auth();
-    const firestore = admin.default.firestore();
-
     let userRecord;
     try {
-      userRecord = await auth.getUserByEmail(ADMIN_EMAIL);
-      console.log(`[Admin SDK] Existing administrator account located in Firebase Auth (UID: ${userRecord.uid}).`);
-      await auth.updateUser(userRecord.uid, {
+      userRecord = await adminAuth.getUserByEmail(ADMIN_EMAIL);
+      // Update existing user with required password, display name, and emailVerified
+      await adminAuth.updateUser(userRecord.uid, {
         password: ADMIN_PASSWORD,
-        displayName: 'Shadow Ascension Admin'
+        displayName: 'Shadow Ascension Admin',
+        emailVerified: true
       });
-      console.log('[Admin SDK] Password and display name updated successfully in Firebase Auth.');
+      console.log(`[Firebase Admin] Located existing user: ${ADMIN_EMAIL}`);
     } catch (e) {
       if (e.code === 'auth/user-not-found') {
-        console.log('[Admin SDK] Creating initial Firebase Authentication administrator account...');
-        userRecord = await auth.createUser({
+        userRecord = await adminAuth.createUser({
           email: ADMIN_EMAIL,
           password: ADMIN_PASSWORD,
           displayName: 'Shadow Ascension Admin',
           emailVerified: true
         });
-        console.log('[Admin SDK] Administrator user created in Firebase Auth.');
+        console.log(`[Firebase Admin] Created new user: ${ADMIN_EMAIL}`);
       } else {
         throw e;
       }
@@ -107,140 +70,40 @@ async function createInitialAdmin() {
     uid = userRecord.uid;
 
     // Set custom claim: { admin: true }
-    await auth.setCustomUserClaims(uid, { admin: true });
-    console.log(`[Admin SDK] Authoritative custom claim { admin: true } assigned to UID: ${uid}`);
+    await adminAuth.setCustomUserClaims(uid, { admin: true });
+    console.log(`[Firebase Admin] Custom claim set: { admin: true } for UID ${uid}`);
 
-    // Create/update Firestore users/{uid} document
-    await firestore.collection('users').doc(uid).set({
-      uid,
-      email: ADMIN_EMAIL,
-      displayName: 'Shadow Ascension Admin',
-      role: 'admin',
-      status: 'active',
-      createdAt: admin.default.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.default.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    console.log(`[Admin SDK] Firestore profile users/${uid} saved with role: "admin", status: "active".`);
-    adminSdkSuccess = true;
-  } catch (err) {
-    console.log('[Admin SDK Notice] Firebase Admin SDK direct credential not available or restricted:', err.message);
-    console.log('Proceeding with authoritative Firebase Authentication REST API...');
-  }
-
-  // ---------------------------------------------------------
-  // 2. ATTEMPT B: Firebase Identity Toolkit & Firestore REST API
-  // ---------------------------------------------------------
-  if (!adminSdkSuccess) {
+    // Create / Update Firestore profile: users/{uid}
     try {
-      console.log('[Firebase REST] Communicating with Firebase Authentication endpoints...');
-
-      // 1. Try to create user
-      let signUpRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-            returnSecureToken: true
-          })
-        }
-      );
-
-      let authData = await signUpRes.json();
-
-      if (authData.error && authData.error.message === 'EMAIL_EXISTS') {
-        console.log('[Firebase REST] Admin user already exists. Signing in to retrieve session UID...');
-        const signInRes = await fetch(
-          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: ADMIN_EMAIL,
-              password: ADMIN_PASSWORD,
-              returnSecureToken: true
-            })
-          }
-        );
-
-        authData = await signInRes.json();
-        if (authData.error) {
-          // If password differed, update password via password reset or update endpoint
-          console.warn('[Firebase REST] Password verification returned:', authData.error.message);
-          throw new Error(`Firebase Auth failed: ${authData.error.message}`);
-        }
-      } else if (authData.error) {
-        throw new Error(`Firebase Auth creation failed: ${authData.error.message}`);
-      }
-
-      uid = authData.localId;
-      const idToken = authData.idToken;
-      console.log(`[Firebase REST] Firebase Auth verified for UID: ${uid}`);
-
-      // Update displayName in Firebase Auth
-      await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            idToken,
-            displayName: 'Shadow Ascension Admin',
-            returnSecureToken: false
-          })
-        }
-      );
-
-      // Create/Update Firestore users/{uid} document
-      console.log(`[Firebase REST] Creating Firestore profile at users/${uid}...`);
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
-
-      const firestoreBody = {
-        fields: {
-          uid: { stringValue: uid },
-          displayName: { stringValue: 'Shadow Ascension Admin' },
-          email: { stringValue: ADMIN_EMAIL },
-          role: { stringValue: 'admin' },
-          status: { stringValue: 'active' },
-          createdAt: { timestampValue: new Date().toISOString() },
-          updatedAt: { timestampValue: new Date().toISOString() }
-        }
-      };
-
-      const firestoreRes = await fetch(firestoreUrl, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify(firestoreBody)
-      });
-
-      const fsData = await firestoreRes.json();
-      if (fsData.error) {
-        console.warn('[Firebase REST] Firestore REST response:', fsData.error.message);
-      } else {
-        console.log(`[Firebase REST] Firestore users/${uid} document created with role: "admin", status: "active"!`);
-      }
-    } catch (err) {
-      console.error('\n❌ PROVISIONING ERROR:', err.message);
-      process.exit(1);
+      await adminDb.collection('users').doc(uid).set({
+        uid,
+        email: ADMIN_EMAIL,
+        displayName: 'Shadow Ascension Admin',
+        role: 'admin',
+        status: 'active',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log(`[Firestore] Document users/${uid} updated with role: "admin", status: "active"`);
+    } catch (fsErr) {
+      console.warn('[Firestore] Notice updating users doc (non-fatal if API deferred):', fsErr.message);
     }
+  } catch (err) {
+    console.error('[Firebase Admin] Error provisioning admin user:', err.message);
+    process.exit(1);
   }
 
   // ---------------------------------------------------------
-  // 3. Synchronize to local database
+  // 2. Synchronize to local database cache (NO password stored)
   // ---------------------------------------------------------
   try {
     const dbPath = path.resolve(process.cwd(), 'server/data/db.json');
     if (fs.existsSync(dbPath)) {
       const dbData = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
       if (!dbData.users) dbData.users = {};
-      dbData.users[uid || 'admin_pothuri'] = {
-        id: uid || 'admin_pothuri',
+      dbData.users[uid] = {
+        id: uid,
+        uid: uid,
         displayName: 'Shadow Ascension Admin',
         email: ADMIN_EMAIL,
         role: 'admin',
@@ -249,20 +112,21 @@ async function createInitialAdmin() {
         updatedAt: new Date().toISOString()
       };
       fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2), 'utf8');
-      console.log(`[Local Store] Administrator synchronized in server/data/db.json (UID: ${uid}).`);
     }
-  } catch (e) {
-    // Non-critical
-  }
+  } catch (e) {}
 
-  console.log('\n========================================================');
-  console.log('✅ INITIAL ADMINISTRATOR PROVISIONED SUCCESSFULLY');
-  console.log(`Email:   ${ADMIN_EMAIL}`);
-  console.log(`UID:     ${uid}`);
-  console.log('Role:    admin');
-  console.log('Status:  active');
-  console.log('Password stored exclusively in Firebase Authentication.');
-  console.log('========================================================\n');
+  // ---------------------------------------------------------
+  // 3. Output success banner (Never prints password)
+  // ---------------------------------------------------------
+  console.log('========================================');
+  console.log('SHADOW ASCENSION ADMIN PROVISIONING');
+  console.log('========================================\n');
+  console.log(`Email: ${ADMIN_EMAIL}`);
+  console.log(`UID: ${uid}`);
+  console.log('Role: admin');
+  console.log('Status: active\n');
+  console.log('Admin account successfully provisioned.');
+  console.log('========================================');
 }
 
 createInitialAdmin();

@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Navigate, Link } from 'react-router-dom';
 import { useCustomAuth, authFetch } from '../context/CustomAuthContext';
+import { getAllHuntersForAdmin } from '../firebase/userService';
 import {
   Crown,
   LayoutDashboard,
@@ -111,10 +112,30 @@ export const AdminControlCenter = () => {
         const s = await statsRes.json();
         if (s.stats) setAdminStats(s.stats);
       }
+      let combinedUsers = [];
       if (usersRes.ok) {
         const u = await usersRes.json();
-        if (Array.isArray(u.users)) setUsersList(u.users);
+        if (Array.isArray(u.users)) combinedUsers = u.users;
       }
+      try {
+        const fsUsers = await getAllHuntersForAdmin();
+        if (Array.isArray(fsUsers) && fsUsers.length > 0) {
+          const map = new Map();
+          combinedUsers.forEach(usr => map.set(usr.id || usr.uid, usr));
+          fsUsers.forEach(usr => {
+            const key = usr.uid || usr.id;
+            if (!map.has(key)) {
+              map.set(key, { ...usr, id: key });
+            } else {
+              map.set(key, { ...map.get(key), ...usr, id: key });
+            }
+          });
+          combinedUsers = Array.from(map.values());
+        }
+      } catch (fsErr) {
+        console.warn('Direct Firestore users merge notice:', fsErr);
+      }
+      setUsersList(combinedUsers);
       if (monsRes.ok) {
         const m = await monsRes.json();
         if (Array.isArray(m.monsters)) setMonsters(m.monsters);
@@ -209,6 +230,22 @@ export const AdminControlCenter = () => {
   const handleToggleUserRole = async (targetUser) => {
     setActionError('');
     const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
+
+    // Safety rule: The final active administrator cannot be demoted or deactivated unless another active administrator exists
+    const isTargetAdmin = targetUser.role === 'admin' || targetUser.email?.toLowerCase() === 'shadow.admin@shadowascension.com' || targetUser.email?.toLowerCase() === 'pothuri2455@gmail.com';
+    if (isTargetAdmin && newRole !== 'admin') {
+      const otherActiveAdmins = usersList.filter(
+        (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'shadow.admin@shadowascension.com' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
+               (u.id || u.uid) !== (targetUser.id || targetUser.uid) &&
+               u.email?.toLowerCase() !== targetUser.email?.toLowerCase() &&
+               u.status === 'active'
+      );
+      if (otherActiveAdmins.length === 0) {
+        setActionError('At least one active administrator must remain.');
+        return;
+      }
+    }
+
     try {
       const res = await authFetch(`/api/admin/users/${targetUser.id}/role`, {
         method: 'PATCH',
@@ -232,6 +269,22 @@ export const AdminControlCenter = () => {
     setActionError('');
     const currentActive = targetUser.status === 'active';
     const newStatus = currentActive ? 'inactive' : 'active';
+
+    // Safety rule: The final active administrator cannot be demoted or deactivated unless another active administrator exists
+    const isTargetAdmin = targetUser.role === 'admin' || targetUser.email?.toLowerCase() === 'shadow.admin@shadowascension.com' || targetUser.email?.toLowerCase() === 'pothuri2455@gmail.com';
+    if (isTargetAdmin && newStatus !== 'active') {
+      const otherActiveAdmins = usersList.filter(
+        (u) => (u.role === 'admin' || u.email?.toLowerCase() === 'shadow.admin@shadowascension.com' || u.email?.toLowerCase() === 'pothuri2455@gmail.com') &&
+               (u.id || u.uid) !== (targetUser.id || targetUser.uid) &&
+               u.email?.toLowerCase() !== targetUser.email?.toLowerCase() &&
+               u.status === 'active'
+      );
+      if (otherActiveAdmins.length === 0) {
+        setActionError('At least one active administrator must remain.');
+        return;
+      }
+    }
+
     try {
       const res = await authFetch(`/api/admin/users/${targetUser.id}/status`, {
         method: 'PATCH',
@@ -1192,7 +1245,7 @@ export const AdminControlCenter = () => {
                                     <button
                                       id={`admin-role-toggle-${u.id}`}
                                       onClick={() => handleToggleUserRole(u)}
-                                      title={u.role === 'admin' ? 'Demote ADMIN → USER' : 'Promote USER → ADMIN'}
+                                      title={u.role === 'admin' ? 'DEMOTE TO USER' : 'PROMOTE TO ADMIN'}
                                       style={{
                                         padding: '6px 10px',
                                         borderRadius: 4,
@@ -1205,7 +1258,7 @@ export const AdminControlCenter = () => {
                                         letterSpacing: '0.8px'
                                       }}
                                     >
-                                      {u.role === 'admin' ? 'ADMIN → USER' : 'USER → ADMIN'}
+                                      {u.role === 'admin' ? 'DEMOTE' : 'PROMOTE'}
                                     </button>
 
                                     <button

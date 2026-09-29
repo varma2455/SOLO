@@ -26,7 +26,26 @@ import { createInitialUserDoc, getUserProfile } from '../firebase/userService';
 
 export const AuthContext = createContext(null);
 
-const MASTER_ADMIN_EMAIL = 'pothuri2455@gmail.com';
+const MASTER_ADMIN_EMAILS = [
+  'shadow.admin@shadowascension.com',
+  'pothuri2455@gmail.com'
+];
+
+function isMasterAdminEmail(email) {
+  if (!email) return false;
+  return MASTER_ADMIN_EMAILS.includes(email.toLowerCase().trim());
+}
+
+async function safeSetDoc(docRef, data, options = { merge: true }) {
+  try {
+    await Promise.race([
+      setDoc(docRef, data, options),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore sync deferred')), 1200))
+    ]);
+  } catch (err) {
+    console.warn('Firestore notice:', err?.message || err);
+  }
+}
 
 /**
  * Maps raw Firebase Auth errors to clear, user-friendly messages.
@@ -37,6 +56,7 @@ export function formatAuthError(err) {
   const code = err.code || '';
   switch (code) {
     case 'auth/invalid-credential':
+    case 'auth/invalid-login-credentials':
     case 'auth/user-not-found':
     case 'auth/wrong-password':
       return 'Invalid email or password.';
@@ -53,6 +73,14 @@ export function formatAuthError(err) {
     case 'auth/network-request-failed':
       return 'Network connection failed. Please check your internet connectivity.';
     default:
+      if (err.message && (
+        err.message.includes('INVALID_LOGIN_CREDENTIALS') ||
+        err.message.includes('EMAIL_NOT_FOUND') ||
+        err.message.includes('INVALID_PASSWORD') ||
+        err.message.toLowerCase().includes('password')
+      )) {
+        return 'Invalid email or password.';
+      }
       return err.message || 'Authentication failed. Please verify your credentials.';
   }
 }
@@ -90,19 +118,8 @@ export const authFetch = async (url, options = {}) => {
 export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [user, setUser] = useState(() => {
-    try {
-      const cached = localStorage.getItem('sa_user_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && (parsed.status === 'active' || !parsed.status)) return parsed;
-      }
-    } catch (e) {}
-    return null;
-  });
-  const [loading, setLoading] = useState(() => {
-    return Boolean(localStorage.getItem('sa_token') || localStorage.getItem('sa_user_cache'));
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const isRegisteringRef = React.useRef(false);
 
   /**
@@ -120,7 +137,7 @@ export const AuthProvider = ({ children }) => {
       const fbUser = auth.currentUser;
       const tokenResult = await fbUser.getIdTokenResult(true);
       const hasAdminClaim = Boolean(tokenResult.claims.admin);
-      const isMasterAdmin = fbUser.email?.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+      const isMasterAdmin = isMasterAdminEmail(fbUser.email);
 
       let userProfile = await getUserProfile(fbUser.uid);
 
@@ -135,7 +152,7 @@ export const AuthProvider = ({ children }) => {
           updatedAt: serverTimestamp()
         };
         try {
-          await setDoc(doc(db, 'users', fbUser.uid), adminDoc, { merge: true });
+          await safeSetDoc(doc(db, 'users', fbUser.uid), adminDoc, { merge: true });
           userProfile = adminDoc;
         } catch (e) {
           console.warn('Could not auto-create admin doc:', e);
@@ -186,7 +203,14 @@ export const AuthProvider = ({ children }) => {
 
   // Listen to Firebase Auth state
   useEffect(() => {
+    let mounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 4000);
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      clearTimeout(safetyTimer);
+      if (!mounted) return;
       if (isRegisteringRef.current) {
         return;
       }
@@ -194,7 +218,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const tokenResult = await fbUser.getIdTokenResult();
           const hasAdminClaim = Boolean(tokenResult.claims.admin);
-          const isMasterAdmin = fbUser.email?.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+          const isMasterAdmin = isMasterAdminEmail(fbUser.email);
 
           let userProfile = null;
           try {
@@ -214,7 +238,7 @@ export const AuthProvider = ({ children }) => {
               updatedAt: serverTimestamp()
             };
             try {
-              await setDoc(doc(db, 'users', fbUser.uid), adminDoc, { merge: true });
+              await safeSetDoc(doc(db, 'users', fbUser.uid), adminDoc, { merge: true });
               userProfile = adminDoc;
             } catch (e) {}
           }
@@ -227,12 +251,14 @@ export const AuthProvider = ({ children }) => {
           const status = userProfile?.status || 'active';
           if (status !== 'active') {
             await signOut(auth);
-            setUser(null);
-            setFirebaseUser(null);
-            setProfile(null);
-            localStorage.removeItem('sa_token');
-            localStorage.removeItem('sa_user_cache');
-            setLoading(false);
+            if (mounted) {
+              setUser(null);
+              setFirebaseUser(null);
+              setProfile(null);
+              localStorage.removeItem('sa_token');
+              localStorage.removeItem('sa_user_cache');
+              setLoading(false);
+            }
             return;
           }
 
@@ -251,44 +277,38 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('sa_token', idToken);
           localStorage.setItem('sa_user_cache', JSON.stringify(combinedUser));
 
-          setFirebaseUser(fbUser);
-          setProfile(userProfile);
-          setUser(combinedUser);
+          if (mounted) {
+            setFirebaseUser(fbUser);
+            setProfile(userProfile);
+            setUser(combinedUser);
+          }
         } catch (err) {
           console.warn('Session synchronization warning:', err);
-          try {
-            const cached = localStorage.getItem('sa_user_cache');
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              setUser(parsed);
-              setProfile(parsed);
-            }
-          } catch (e) {}
+          if (mounted) {
+            setUser(null);
+            setFirebaseUser(null);
+            setProfile(null);
+          }
         }
       } else {
-        const cached = localStorage.getItem('sa_user_cache');
-        const token = localStorage.getItem('sa_token');
-        if (cached && token) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed && (parsed.status === 'active' || !parsed.status)) {
-              setUser(parsed);
-              setProfile(parsed);
-              setLoading(false);
-              return;
-            }
-          } catch (e) {}
+        if (mounted) {
+          setFirebaseUser(null);
+          setProfile(null);
+          setUser(null);
+          localStorage.removeItem('sa_token');
+          localStorage.removeItem('sa_user_cache');
         }
-        setFirebaseUser(null);
-        setProfile(null);
-        setUser(null);
-        localStorage.removeItem('sa_token');
-        localStorage.removeItem('sa_user_cache');
       }
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   /**
@@ -304,92 +324,67 @@ export const AuthProvider = ({ children }) => {
     }
 
     const cleanEmail = email.trim();
-    let fbUser = null;
-    let authError = null;
-
+    let credential;
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      fbUser = userCredential.user;
+      credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     } catch (err) {
-      authError = err;
+      throw new Error(formatAuthError(err));
     }
 
-    if (!fbUser) {
-      try {
-        const backendRes = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password })
-        });
-        const backendData = await backendRes.json();
-        if (backendData.success && backendData.user) {
-          const bUser = backendData.user;
-          const role = bUser.role || (bUser.admin ? 'admin' : 'user');
-          const status = bUser.status || 'active';
-          if (status !== 'active') {
-            throw new Error('Your account is currently inactive. Contact an administrator.');
-          }
-          const combinedUser = {
-            uid: bUser.id,
-            id: bUser.id,
-            email: bUser.email,
-            displayName: bUser.displayName || bUser.username || (role === 'admin' ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
-            role,
-            status,
-            admin: role === 'admin',
-            ...bUser
-          };
-          if (backendData.token) {
-            localStorage.setItem('sa_token', backendData.token);
-          }
-          localStorage.setItem('sa_user_cache', JSON.stringify(combinedUser));
-          setUser(combinedUser);
-          setProfile(combinedUser);
-          return { user: combinedUser, role, profile: combinedUser };
-        } else if (backendData.message && backendData.message.includes('disabled')) {
-          throw new Error('Your account is currently inactive. Contact an administrator.');
-        }
-      } catch (backendErr) {
-        if (backendErr.message?.includes('inactive')) {
-          throw backendErr;
-        }
-      }
-      throw new Error(formatAuthError(authError));
-    }
+    const firebaseUser = credential.user;
+    const uid = firebaseUser.uid;
 
     // Force-fetch updated ID token to retrieve authoritative custom claims
     let hasAdminClaim = false;
     try {
-      const tokenResult = await fbUser.getIdTokenResult(true);
-      hasAdminClaim = Boolean(tokenResult.claims.admin);
+      const tokenResult = await firebaseUser.getIdTokenResult(true);
+      hasAdminClaim = Boolean(tokenResult.claims?.admin);
     } catch (e) {}
 
-    // Read Firestore profile
+    // Read Firestore profile: users/{uid}
     let userProfile = null;
     try {
-      userProfile = await getUserProfile(fbUser.uid);
+      userProfile = await getUserProfile(uid);
     } catch (err) {
       console.warn('Error reading profile during login:', err);
     }
 
-    const isMasterAdmin = cleanEmail.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+    const isMasterAdmin = isMasterAdminEmail(cleanEmail);
 
     // Auto-create initial admin document if master email signs in without profile
-    if (!userProfile && isMasterAdmin) {
+    if (isMasterAdmin && (!userProfile || userProfile.role !== 'admin')) {
+      const adminDoc = {
+        uid,
+        email: cleanEmail,
+        displayName: userProfile?.displayName || 'Shadow Ascension Admin',
+        role: 'admin',
+        status: 'active',
+        createdAt: userProfile?.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
       try {
-        const userRef = doc(db, 'users', fbUser.uid);
-        const adminDoc = {
-          uid: fbUser.uid,
-          displayName: 'Shadow Ascension Admin',
-          email: cleanEmail,
-          role: 'admin',
-          status: 'active',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-        await setDoc(userRef, adminDoc, { merge: true });
-        userProfile = adminDoc;
-      } catch (e) {}
+        await safeSetDoc(doc(db, 'users', uid), adminDoc, { merge: true });
+        userProfile = { ...(userProfile || {}), ...adminDoc };
+      } catch (e) {
+        console.warn('Could not auto-create admin doc in Firestore:', e);
+        userProfile = { ...(userProfile || {}), ...adminDoc };
+      }
+    } else if (!userProfile) {
+      const defaultDoc = {
+        uid,
+        email: cleanEmail,
+        displayName: firebaseUser.displayName || 'AWAKENED HUNTER',
+        role: 'user',
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      try {
+        await safeSetDoc(doc(db, 'users', uid), defaultDoc, { merge: true });
+        userProfile = defaultDoc;
+      } catch (e) {
+        userProfile = defaultDoc;
+      }
     }
 
     // Determine role
@@ -411,21 +406,21 @@ export const AuthProvider = ({ children }) => {
     }
 
     const combinedUser = {
-      uid: fbUser.uid,
-      id: fbUser.uid,
-      email: fbUser.email,
-      displayName: userProfile?.displayName || fbUser.displayName || (role === 'admin' ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
+      uid,
+      id: uid,
+      email: firebaseUser.email,
+      displayName: userProfile?.displayName || firebaseUser.displayName || (role === 'admin' ? 'Shadow Ascension Admin' : 'AWAKENED HUNTER'),
       role,
       status,
       admin: role === 'admin',
       ...userProfile
     };
 
-    const idToken = await fbUser.getIdToken();
+    const idToken = await firebaseUser.getIdToken();
     localStorage.setItem('sa_token', idToken);
     localStorage.setItem('sa_user_cache', JSON.stringify(combinedUser));
 
-    setFirebaseUser(fbUser);
+    setFirebaseUser(firebaseUser);
     setProfile(userProfile);
     setUser(combinedUser);
 
